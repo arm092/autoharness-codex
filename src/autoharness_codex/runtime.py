@@ -176,6 +176,9 @@ class Runtime:
                 self.lib.retire_unused(self.lib.counter('turns'),
                                        maturity=300 if self.scope == 'global' else 100,
                                        capacity=20 if self.scope == 'global' else 50)
+                global_lib = self._global()
+                if global_lib and self.scope != 'global':
+                    global_lib.retire_unused(global_lib.counter('turns'), maturity=300, capacity=20)
             if self.settings.auto:
                 (launch or self.launch)()
             return {'hookSpecificOutput': {'hookEventName': name,
@@ -203,6 +206,12 @@ class Runtime:
                 fresh = bool(db.execute('INSERT OR IGNORE INTO events VALUES (?,?)', (self.scope, token)).rowcount)
                 if fresh:
                     turns = self.lib.bump('turns', db)
+            if fresh and self.settings.global_enabled and self.scope != 'global':
+                global_lib = self._global()
+                with global_lib.transaction() as db:
+                    global_token = digest([self.scope, token])
+                    if db.execute('INSERT OR IGNORE INTO events VALUES (?,?)', ('global', global_token)).rowcount:
+                        global_lib.bump('turns', db)
         queued = 0
         if self.settings.auto and fresh:
             with self.lib.connect() as db:

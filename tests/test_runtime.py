@@ -139,6 +139,19 @@ class RuntimeTests(unittest.TestCase):
             args = launch.call_args.args[0]
             self.assertEqual(args[args.index('--scope')+1], 'global')
 
+    def test_opt_in_global_retirement_counts_main_replies_without_duplicates(self):
+        self.settings.global_enabled = True
+        self.event_call('Stop', turn_id='once')
+        self.event_call('Stop', turn_id='once')
+        global_lib = Library(self.settings.data, 'global')
+        self.assertEqual(global_lib.counter('turns'), 1)
+        global_lib.apply([create()], EVIDENCE, 'global-create')
+        with global_lib.transaction() as db:
+            db.execute("UPDATE counters SET value=301 WHERE scope='global' AND key='turns'")
+        self.settings.retire = True
+        self.event_call('SessionStart')
+        self.assertEqual(global_lib.list(), [])
+
 
 if __name__ == '__main__':
     unittest.main()
