@@ -101,6 +101,15 @@ class WindowsInstallTests(unittest.TestCase):
             driver.register(self.root, self.binary, self.home/'other', self.run)
         self.assertFalse(any('add' in c for c in self.run.calls if '--help' not in c))
 
+    def test_uninstall_preflight_is_read_only_so_canceling_keeps_registration(self):
+        driver.register(self.root, self.binary, self.home, self.run)
+        self.run.calls.clear()
+        state = (self.root/'install-state.json').read_bytes()
+        self.assertTrue(driver.uninstall_state(self.root, self.run)['registered'])
+        self.assertFalse(any('add' in c or 'remove' in c for c in self.run.calls))
+        self.assertEqual((self.root/'install-state.json').read_bytes(), state)
+        self.assertTrue(self.run.installed[0]['installed'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,6 @@
 """Plugin entry point; no pip install is needed."""
 import sys
+sys.dont_write_bytecode = True
 import json
 import os
 from pathlib import Path

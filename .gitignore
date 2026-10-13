@@ -10,4 +10,9 @@ __pycache__/
 .venv/
 build/
 dist/
+runtime/
+*.zip
+*.exe
+installation.json
+install-state.json
 *.egg-info/

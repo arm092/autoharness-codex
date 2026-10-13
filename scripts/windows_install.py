@@ -67,8 +67,21 @@ def owned_marketplace(binary, home, plugin, run):
 def atomic_json(path, value):
     path = Path(path)
     temporary = path.with_suffix(path.suffix+'.new')
-    temporary.write_text(json.dumps(value, indent=2)+'\n', encoding='utf-8')
+    temporary.write_text(json.dumps(value, indent=2, ensure_ascii=True)+'\n', encoding='utf-8')
     temporary.replace(path)
+
+
+def preflight(root, binary, home, run=run_codex):
+    root, home = Path(root).resolve(), Path(home).resolve()
+    validate_cli(binary, home, run)
+    if root == home or root in home.parents or home in root.parents:
+        raise ValueError('Install the program outside the Codex profile folder.')
+    state_path = root/'install-state.json'
+    if state_path.exists():
+        old = json.loads(state_path.read_text(encoding='utf-8'))
+        if canonical(old['home']) != canonical(home) or canonical(old['plugin']) != canonical(root/'plugin'):
+            raise ValueError('Repair/update must use the original folder and Codex profile. Uninstall first to move it.')
+    owned_marketplace(binary, home, root/'plugin', run)
 
 
 def register(root, binary, home, run=run_codex):
@@ -76,12 +89,7 @@ def register(root, binary, home, run=run_codex):
     plugin, state_path = root/'plugin', root/'install-state.json'
     if not (plugin/'.codex-plugin/plugin.json').is_file() or not (plugin/'runtime/python.exe').is_file():
         raise ValueError('The complete Windows plugin payload is missing.')
-    validate_cli(binary, home, run)
-    if state_path.exists():
-        old = json.loads(state_path.read_text(encoding='utf-8'))
-        if canonical(old['home']) != canonical(home) or canonical(old['plugin']) != canonical(plugin):
-            raise ValueError('Repair/update must use the original folder and Codex profile. Uninstall first to move it.')
-    owned_marketplace(binary, home, plugin, run)
+    preflight(root, binary, home, run)
     manifest = json.loads((plugin/'.codex-plugin/plugin.json').read_text(encoding='utf-8'))
     state = dict(plugin=str(plugin), codex=str(binary), home=str(home), version=manifest['version'], registered=False)
     # A durable pending state makes a partially failed registration removable.
@@ -102,30 +110,39 @@ def register(root, binary, home, run=run_codex):
     return state
 
 
-def unregister(root, run=run_codex):
+def uninstall_state(root, run=run_codex):
     root = Path(root).resolve()
     state_path = root/'install-state.json'
     if not state_path.is_file():
-        return {'status': 'not_registered'}
+        return None
     state = json.loads(state_path.read_text(encoding='utf-8'))
     plugin = root/'plugin'
     if canonical(state['plugin']) != canonical(plugin):
         raise ValueError('Installation ownership mismatch; no Codex settings were changed.')
     binary, home = Path(state['codex']), Path(state['home'])
-    if not owned_marketplace(binary, home, plugin, run):
-        return {'status': 'already_removed'}
+    owned_marketplace(binary, home, plugin, run)
+    return state
+
+
+def unregister(root, run=run_codex):
+    root = Path(root).resolve()
+    state = uninstall_state(root, run)
+    if state is None:
+        return {'status': 'not_registered'}
+    binary, home = Path(state['codex']), Path(state['home'])
     installed = json.loads(run(binary, home, ['plugin', 'list', '--json'])).get('installed', [])
     if any(p.get('pluginId') == PLUGIN and p.get('installed') for p in installed):
         run(binary, home, ['plugin', 'remove', PLUGIN])
-    run(binary, home, ['plugin', 'marketplace', 'remove', MARKETPLACE, '--json'])
+    if owned_marketplace(binary, home, root/'plugin', run):
+        run(binary, home, ['plugin', 'marketplace', 'remove', MARKETPLACE, '--json'])
     # Only installation metadata is removed. The knowledge directory is never touched.
-    state_path.unlink()
+    (root/'install-state.json').unlink()
     return {'status': 'removed', 'knowledge_preserved': True}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['probe', 'register', 'unregister'])
+    parser.add_argument('action', choices=['probe', 'register', 'check-uninstall', 'unregister'])
     parser.add_argument('--root')
     parser.add_argument('--codex')
     parser.add_argument('--codex-home')
@@ -136,9 +153,13 @@ def main():
         binary = args.codex or discover_codex()
         home = args.codex_home or os.environ.get('CODEX_HOME', str(Path.home()/'.codex'))
         if args.action == 'probe':
-            result = {'ok': True, 'codex': binary, 'home': home, 'version': validate_cli(binary, home)}
+            preflight(root, binary, home)
+            result = {'ok': True, 'codex': binary, 'home': home}
         elif args.action == 'register':
             result = {'ok': True, **register(root, binary, home)}
+        elif args.action == 'check-uninstall':
+            uninstall_state(root)
+            result = {'ok': True, 'status': 'ready_to_uninstall'}
         else:
             result = {'ok': True, **unregister(root)}
         code = 0

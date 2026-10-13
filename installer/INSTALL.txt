@@ -1,0 +1,24 @@
+AutoHarness for Codex – Windows x64
+
+Run the Setup.exe installer. Python is included; no terminal commands or administrator permissions are needed.
+Choose your Codex executable and profile if automatic detection needs correction.
+After installation, restart Codex, open /hooks, review and trust the five plugin hooks.
+An installed and signed-in Codex CLI with native plugins/hooks is required.
+
+Update/repair: close Codex sessions and run the newer installer over the same folder/profile.
+Uninstall: Windows Settings > Apps > AutoHarness for Codex > Uninstall.
+Knowledge stays in CODEX_HOME/autoharness-codex (or your AUTOHARNESS_CODEX_DATA override).
+This installer is unsigned. Its SHA256 checksum is supplied alongside the download.
+
+Portable ZIP: extract into a permanent folder, then run:
+plugin\runtime\python.exe plugin\scripts\windows_install.py register --codex "C:\path\codex.exe"
+Remove portable registration before deleting/moving the folder:
+plugin\runtime\python.exe plugin\scripts\windows_install.py unregister
+
+Русская инструкция
+
+Запусти Setup.exe и следуй мастеру. Python уже встроен, права администратора не нужны.
+После установки перезапусти Codex, открой /hooks и разреши пять хуков плагина.
+Для обновления закрой сессии Codex и запусти новый установщик с прежней папкой и профилем.
+Для удаления используй «Параметры Windows → Приложения → AutoHarness for Codex».
+Библиотека знаний сохранится. Установщик не подписан цифровым сертификатом.
