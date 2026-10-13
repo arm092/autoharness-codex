@@ -12,6 +12,7 @@ from .capture import capture
 from .library import Library
 from .episode import normalize, records
 from .retrieval import rank
+from . import costs
 from .policy import Conflict, Rejected, digest, redact
 
 
@@ -49,6 +50,11 @@ class Settings:
     consolidate: int = 250
     codex: str = ''
     model: str = ''
+    source_bytes: int = 24000
+    library_bytes: int = 32000
+    prompt_bytes: int = 64000
+    output_tokens: int = 8192
+    daily_tokens: int = 200000
 
     @classmethod
     def from_env(cls, cwd=None):
@@ -67,7 +73,12 @@ class Settings:
                    global_enabled=env.get('AUTOHARNESS_CODEX_GLOBAL', '0') == '1',
                    retire=env.get('AUTOHARNESS_CODEX_RETIRE', '0') == '1',
                    consolidate=_integer(env, 'AUTOHARNESS_CODEX_CONSOLIDATE', 250, low=0),
-                   codex=env.get('AUTOHARNESS_CODEX_BIN', ''), model=env.get('AUTOHARNESS_CODEX_MODEL', ''))
+                   codex=env.get('AUTOHARNESS_CODEX_BIN', ''), model=env.get('AUTOHARNESS_CODEX_MODEL', ''),
+                   source_bytes=_integer(env,'AUTOHARNESS_CODEX_SOURCE_BYTES',24000,low=512,high=200000),
+                   library_bytes=_integer(env,'AUTOHARNESS_CODEX_LIBRARY_BYTES',32000,low=512,high=256000),
+                   prompt_bytes=_integer(env,'AUTOHARNESS_CODEX_PROMPT_BYTES',64000,low=8192,high=512000),
+                   output_tokens=_integer(env,'AUTOHARNESS_CODEX_OUTPUT_ALLOWANCE',8192,low=512,high=64000),
+                   daily_tokens=_integer(env,'AUTOHARNESS_CODEX_DAILY_TOKENS',200000,low=1,high=10000000))
 
 
 class Runtime:
@@ -88,9 +99,15 @@ class Runtime:
             runs = [dict(row) for row in db.execute(
                 'SELECT id,kind,status,attempts,error,created,result FROM jobs WHERE scope=? ORDER BY created DESC LIMIT 10',
                 (self.scope,))]
+            for run in runs:
+                context=db.execute('SELECT stats FROM job_context WHERE scope=? AND job=?',(self.scope,run['id'])).fetchone()
+                run['context']=json.loads(context[0]) if context else None
+            usage=costs.summary(db,self.scope,self.settings.daily_tokens,time.time())
         return dict(scope=self.scope, data=str(self.settings.data), skills=len(self.lib.list()),
                     jobs=counts, runs=runs, automatic=self.settings.auto,
-                    auto_archive=self.settings.retire, global_enabled=self.settings.global_enabled)
+                    auto_archive=self.settings.retire, global_enabled=self.settings.global_enabled,usage=usage,
+                    context_limits={'source_bytes':self.settings.source_bytes,'library_bytes':self.settings.library_bytes,
+                                    'prompt_bytes':self.settings.prompt_bytes,'output_allowance':self.settings.output_tokens})
 
     def index(self, prompt=None):
         libraries = [self.lib]
@@ -104,7 +121,7 @@ class Runtime:
                  'subject to current user instructions. Use the library_read MCP tool to inspect relevant skills. '
                  'Loading a skill is not proof it helped.']
         for scope, skill in sorted(skills, key=lambda item: (item[1].get('category', ''), item[1]['name'])) if prompt is None else skills:
-            line = f"{skill.get('category', 'general')}: {skill['name']} [{scope}] {skill['description']}"
+            line = f"{skill.get('category', 'general')}: {skill['name']} [{scope}; {skill.get('source_kind','legacy_untyped')}] {skill['description']}"
             if len(('\n'.join(lines)+'\n'+line).encode('utf-8')) > 5800:
                 lines.append('Index truncated; library_list returns all managed skills.')
                 break
@@ -254,6 +271,8 @@ class Runtime:
     def work(self, *, model=None):
         owner, now = uuid.uuid4().hex, time.time()
         lease_seconds = self.settings.timeout + 60
+        plan=None
+        skills=[]
         with self.lib.transaction() as db:
             lease = db.execute('SELECT * FROM leases WHERE scope=?', (self.scope,)).fetchone()
             if lease and lease['expires'] > now:
@@ -277,6 +296,20 @@ class Runtime:
             if not job:
                 return {'status': 'idle'}
             job = dict(job)
+            if records(job['evidence']) is None:
+                job['evidence']=normalize(job['evidence'],origin='library' if job['kind']=='curate' else
+                                           ('manual' if job['session']=='manual' else 'transcript'))
+                db.execute('UPDATE jobs SET evidence=? WHERE id=?',(job['evidence'],job['id']))
+            if job['status'] != 'proposed':
+                from .model import prepare
+                self.settings._global_job=self.scope=='global'
+                skills=[self.lib.read(s['name']) for s in self.lib.list()]
+                plan=prepare(job['evidence'],skills,job['kind'],self.settings)
+                db.execute('INSERT INTO job_context VALUES (?,?,?) ON CONFLICT(scope,job) DO UPDATE SET stats=excluded.stats',
+                           (self.scope,job['id'],json.dumps(plan.stats)))
+                if not plan.eligible:
+                    job['status'],job['result']='proposed','[]'
+                    db.execute("UPDATE jobs SET status='proposed',result='[]' WHERE id=?",(job['id'],))
             if job['status'] != 'proposed':
                 count = db.execute('SELECT COUNT(*) FROM attempts WHERE scope=? AND started>?', (self.scope, now-3600)).fetchone()[0]
                 if count >= self.settings.hourly_limit:
@@ -284,6 +317,9 @@ class Runtime:
                 last = db.execute('SELECT MAX(started) FROM attempts WHERE scope=?', (self.scope,)).fetchone()[0]
                 if last and now-last < self.settings.debounce:
                     return {'status': 'debounced'}
+                if not costs.reserve(db,self.scope,owner,job['id'],plan,now,self.settings.daily_tokens):
+                    return {'status':'daily_budget_limited','job':job['id'],
+                            'reservation_tokens':plan.input_estimate+plan.output_allowance}
                 db.execute('INSERT INTO attempts VALUES (?,?,?)', (self.scope,job['id'],now))
             db.execute('INSERT INTO leases VALUES (?,?,?) ON CONFLICT(scope) DO UPDATE SET owner=excluded.owner,expires=excluded.expires',
                        (self.scope, owner, now+lease_seconds))
@@ -297,14 +333,14 @@ class Runtime:
             if model is None and job['status'] != 'proposed':
                 from .model import reflect
                 self.settings._global_job = self.scope == 'global'
-                model = lambda source, skills, kind: reflect(source, skills, kind, self.settings)
+                model = lambda source, skills, kind: reflect(source, skills, kind, self.settings,prepared=plan)
             # Snapshot full content from the managed scope only, never another project's library.
-            skills = [self.lib.read(s['name']) for s in self.lib.list()]
             proposals = json.loads(job['result']) if job['status'] == 'proposed' else model(job['evidence'], skills, job['kind'])
             with self.lib.transaction() as db:
                 owned = db.execute('SELECT owner FROM leases WHERE scope=?', (self.scope,)).fetchone()
                 if not owned or owned[0] != owner:
                     raise Conflict('Worker lease was superseded before applying proposals.')
+                costs.settle(db,self.scope,owner,getattr(proposals,'usage',None))
                 db.execute('UPDATE jobs SET result=? WHERE id=? AND owner=?', (json.dumps(proposals), job['id'], owner))
             result = self.lib.apply(proposals, job['evidence'], job['id'])
             with self.lib.transaction() as db:
@@ -318,6 +354,7 @@ class Runtime:
             status = 'rejected' if isinstance(exc, Rejected) else ('failed' if job['attempts'] >= 2 else 'queued')
             error = redact(f'{type(exc).__name__}: {exc}')[:2000]
             with self.lib.transaction() as db:
+                costs.settle(db,self.scope,owner,getattr(exc,'usage',None))
                 db.execute('UPDATE jobs SET status=?,error=? WHERE id=? AND owner=?', (status, error, job['id'], owner))
             return {'status': status, 'job': job['id'], 'error': error}
         finally:

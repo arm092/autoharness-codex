@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS session_paths (scope TEXT,session TEXT,path TEXT,upda
 CREATE TABLE IF NOT EXISTS attempts (scope TEXT,job TEXT,started REAL);
 CREATE TABLE IF NOT EXISTS contexts (token TEXT PRIMARY KEY, scope TEXT, session TEXT, cwd TEXT, UNIQUE(scope,session));
 CREATE TABLE IF NOT EXISTS version_sources (scope TEXT,name TEXT,version INTEGER,provenance TEXT,PRIMARY KEY(scope,name,version));
+CREATE TABLE IF NOT EXISTS usage (scope TEXT,attempt TEXT,job TEXT,day TEXT,reserved INTEGER,charged INTEGER,
+ actual_input INTEGER,actual_cached INTEGER,actual_output INTEGER,state TEXT,context TEXT,PRIMARY KEY(scope,attempt));
+CREATE TABLE IF NOT EXISTS job_context (scope TEXT,job TEXT,stats TEXT,PRIMARY KEY(scope,job));
 '''
 
 

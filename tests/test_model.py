@@ -13,6 +13,16 @@ from test_library import EVIDENCE, create
 
 
 class ModelTests(unittest.TestCase):
+    def test_malformed_output_still_carries_reported_usage_for_budget_accounting(self):
+        with tempfile.TemporaryDirectory() as temp:
+            settings=Settings(Path(temp)/'data',Path(temp),codex='codex')
+            def run(args,**kwargs):
+                Path(args[args.index('--output-last-message')+1]).write_text('not json')
+                stdout=json.dumps({'type':'turn.completed','usage':{'input_tokens':199990,'cached_input_tokens':100,'output_tokens':8}})
+                return subprocess.CompletedProcess(args,0,stdout,'')
+            with self.assertRaises(Rejected) as raised:
+                reflect(EVIDENCE,[],'reflect',settings,run=run)
+            self.assertEqual(raised.exception.usage['input_tokens'],199990)
     def test_command_has_no_permission_bypass_and_disables_hooks_tools_plugins(self):
         settings = Settings(Path('data'), Path('.'), codex='codex')
         args = build_command(settings, Path('scratch'), Path('schema.json'), Path('result.json'))

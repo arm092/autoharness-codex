@@ -77,7 +77,10 @@ def normalize(source, *, origin='transcript'):
             if record.get('type') == 'response_item' and typ == 'message':
                 text = _texts(payload.get('content'))
                 if payload.get('role') == 'user':
-                    user(text)
+                    content=payload.get('content')
+                    parts=content if isinstance(content,list) else [content]
+                    for part in parts:
+                        user(_texts([part]) if isinstance(part,dict) else _texts(part))
                 elif payload.get('role') == 'assistant':
                     add('assistant', text)
                 else:
@@ -122,8 +125,10 @@ def provenance(source, proposal):
         selected = [mapping[rid] for rid in ids]
     except (KeyError, TypeError):
         raise Rejected('Unknown evidence record id.') from None
-    if quote not in '\n'.join(record['text'] for record in selected):
-        raise Rejected('Evidence must quote selected record text, not envelope metadata.')
+    pieces=quote.split('\n---\n') if len(selected)>1 else [quote]
+    if len(pieces)!=len(selected) or any(len(piece.strip())<8 or piece not in record['text']
+                                      for piece,record in zip(pieces,selected)):
+        raise Rejected('Quote each selected source in order, separated by a newline, ---, and a newline.')
     kinds = {record['kind'] for record in selected}
     default = {'user': 'user_preference', 'tool_result': 'observed_result', 'manual': 'manual_lesson', 'library': 'consolidation'}
     lesson = proposal.get('lesson_kind') or (default.get(next(iter(kinds))) if len(kinds) == 1 else None)
@@ -132,6 +137,7 @@ def provenance(source, proposal):
              or (lesson == 'manual_lesson' and kinds == {'manual'})
              or (lesson == 'consolidation' and kinds == {'library'})
              or (lesson == 'verified_technique' and kinds == {'user', 'tool_result'}
+                 and selected[0]['kind']=='user' and selected[-1]['kind']=='tool_result'
                  and any(r['kind'] == 'tool_result' and r['verified'] for r in selected)))
     if not valid:
         raise Rejected('Lesson kind is not supported by these source roles.')
