@@ -263,7 +263,7 @@ class Library:
                 continue
             fields, _ = frontmatter(skill['body'])
             results.append({key: skill[key] for key in ('name', 'hash', 'status', 'pinned', 'uses', 'views', 'helpful', 'path')}
-                           | fields)
+                           | fields | {'source_kind': skill['provenance']['kind']})
         return results
 
     def history(self, name):

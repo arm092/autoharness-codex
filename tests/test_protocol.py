@@ -45,6 +45,10 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue(self.call('library_read', {'name': '../escape'})['isError'])
         self.assertTrue(self.call('library_read', {'name': 'runtime-check', 'scope': 'project:other'})['isError'])
         self.assertTrue(self.call('library_feedback', {'name': 'runtime-check', 'kind': 'outcome-success'})['isError'])
+        search=self.call('library_search',{'query':'проверь тесты'})
+        self.assertIn('runtime-check',search['content'][0]['text'])
+        self.assertEqual(json.loads(self.call('library_search',{'query':'bonjour'})['content'][0]['text']),[])
+        self.assertTrue(self.call('library_search',{'query':'tests','limit':100})['isError'])
 
     def test_queue_cannot_apply_fabricated_evidence_and_proposal_diff_is_reviewable(self):
         job = self.rt.enqueue_text(EVIDENCE)

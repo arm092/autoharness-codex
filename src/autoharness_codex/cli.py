@@ -36,6 +36,9 @@ def main(argv=None):
     learn.add_argument('--wait', action='store_true')
     for command in ('read', 'history'):
         commands.add_parser(command).add_argument('name')
+    search = commands.add_parser('search')
+    search.add_argument('query')
+    search.add_argument('--limit',type=int,default=5)
     restore = commands.add_parser('restore')
     restore.add_argument('name')
     restore.add_argument('--version', type=int, required=True)
@@ -84,6 +87,8 @@ def main(argv=None):
             emit(rt.lib.read(args.name, include_archived=True, count_view=True))
         elif args.command == 'history':
             emit(rt.lib.history(args.name))
+        elif args.command == 'search':
+            emit(rt.search(args.query,args.limit))
         elif args.command == 'restore':
             emit(rt.lib.restore(args.name, args.version, args.expected_hash))
         elif args.command == 'pin':

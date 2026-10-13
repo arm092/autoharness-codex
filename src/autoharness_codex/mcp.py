@@ -22,6 +22,8 @@ SCOPE = {'type': 'string', 'enum': ['project', 'global']}
 NAME = {'name': TEXT, 'scope': SCOPE}
 PROPOSALS = {'job_id': TEXT, 'proposals': {'type': 'array', 'items': {'type': 'object'}}}
 TOOLS = [
+    tool('library_search', 'Find relevant managed skills for EN/RU/HY/FR/ES technical queries; returns no unrelated recommendations.',
+         {'query':TEXT,'limit':{'type':'integer','minimum':1},'scope':SCOPE}, ['query']),
     tool('library_list', 'List plugin-owned skills in the current project or opt-in global library.', {'scope': SCOPE, 'include_archived': {'type': 'boolean'}}),
     tool('library_read', 'Read a managed skill and its support files; increments views, not successful uses.', NAME, ['name'], read_only=False),
     tool('library_history', 'Inspect immutable versions and provenance before choosing a restore.', NAME, ['name']),
@@ -91,6 +93,8 @@ class Server:
                 raise Rejected('Invalid type or value for '+key)
         rt = self._runtime(args)
         lib = rt.lib
+        if name == 'library_search':
+            return rt.search(args['query'], args.get('limit',5))
         if name == 'library_list':
             return lib.list(include_archived=args.get('include_archived', False))
         if name == 'library_read':

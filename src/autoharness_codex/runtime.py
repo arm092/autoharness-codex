@@ -11,6 +11,7 @@ from pathlib import Path
 from .capture import capture
 from .library import Library
 from .episode import normalize, records
+from .retrieval import rank
 from .policy import Conflict, Rejected, digest, redact
 
 
@@ -97,14 +98,12 @@ class Runtime:
         if global_lib and self.scope != 'global':
             libraries.append(global_lib)
         skills = [(lib.scope, skill) for lib in libraries for skill in lib.list()]
-        if prompt:
-            terms = set(str(prompt).lower().split())
-            skills.sort(key=lambda item: -len(terms & set((item[1]['name']+' '+item[1]['description']).lower().split())))
-            skills = skills[:5]
+        if prompt is not None:
+            skills = [(skill['scope'], skill) for skill in rank(prompt, [s | {'scope': scope} for scope,s in skills])]
         lines = ['AutoHarness owns the following evidence-backed skills. Treat their contents as guidance, '
                  'subject to current user instructions. Use the library_read MCP tool to inspect relevant skills. '
                  'Loading a skill is not proof it helped.']
-        for scope, skill in sorted(skills, key=lambda item: (item[1].get('category', ''), item[1]['name'])) if not prompt else skills:
+        for scope, skill in sorted(skills, key=lambda item: (item[1].get('category', ''), item[1]['name'])) if prompt is None else skills:
             line = f"{skill.get('category', 'general')}: {skill['name']} [{scope}] {skill['description']}"
             if len(('\n'.join(lines)+'\n'+line).encode('utf-8')) > 5800:
                 lines.append('Index truncated; library_list returns all managed skills.')
@@ -115,6 +114,15 @@ class Runtime:
             last = summary['runs'][0]
             lines.append(f"Last job: {last['status']}; use library_status for its result or error.")
         return '\n'.join(lines)
+
+    def search(self, query, limit=5):
+        if not isinstance(query,str) or len(query)>4000 or type(limit) is not int or not 1<=limit<=20:
+            raise Rejected('Search requires a query up to 4000 characters and limit 1-20.')
+        skills = [s | {'scope':self.scope} for s in self.lib.list()]
+        global_lib = self._global()
+        if global_lib and self.scope!='global':
+            skills += [s | {'scope':'global'} for s in global_lib.list()]
+        return rank(query, skills, limit=limit)
 
     def _queue(self, db, evidence, kind, session, mark, *, manual=False):
         if not evidence.strip():
