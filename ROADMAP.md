@@ -7,7 +7,7 @@ Updated: 2026-10-14. This is retained product documentation, not a temporary pro
 Automatic/manual learning, plugin-owned libraries, quotation checks, immutable history, atomic merges,
 recovery, pins, native Codex hooks, context-bound MCP, Windows packaging, and a six-configuration CI matrix.
 
-## 1.1.0: authorized scope, in development
+## 1.1.0: implemented scope
 
 ### 1. Distinguish knowledge sources
 
@@ -31,6 +31,11 @@ recovery, pins, native Codex hooks, context-bound MCP, Windows packaging, and a 
 - Record actual CLI usage separately from estimates when exact usage is unavailable.
 - Enforce transactional daily token budgets and retain jobs deferred by budgets.
 - Surface selected/omitted context and usage in status and diagnostics.
+
+Delivered through typed episode provenance, local technical aliases for five languages, library_search,
+bounded complete packages, CLI turn.completed usage, and transactional per-scope UTC-day reservations.
+Output allowance is an admission reserve, not a provider-enforced generation limit. Observations and source
+attribution do not prove a rule's semantic correctness; usefulness evaluation remains item 6.
 
 ## Later: not included in 1.1.0
 

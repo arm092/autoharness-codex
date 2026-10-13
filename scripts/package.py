@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORIES = ('.codex-plugin', '.agents/plugins', 'hooks', 'skills', 'src', 'scripts')
-FILES = ('.mcp.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'SECURITY.md')
+FILES = ('.mcp.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'SECURITY.md', 'ROADMAP.md')
 
 
 def package(output, *, portable=False):

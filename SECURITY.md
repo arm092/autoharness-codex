@@ -16,6 +16,9 @@ The child does not inherit unrelated environment secrets or OPENAI_API_KEY.
 
 History text and generated skills are untrusted. Secret redaction and dangerous-pattern checks
 are heuristic filters. A valid evidence quote proves provenance, not truth or safety.
+Supported source roles and source ids are assigned by the plugin. Tool/assistant/unknown text cannot
+be presented as a direct user preference. Quotes from multiple ids must support each selected source.
+An exit code of zero is a mechanical observation, not proof of task success or semantic validity.
 Current user instructions and permissions take precedence over learned instructions.
 New or changed scripts require manual CLI admission with --allow-scripts; the validator never executes them.
 
@@ -24,6 +27,10 @@ cannot partly publish a merge. Unreferenced prepared versions are retained after
 garbage collection deletes evidence. Publication receipts and durable proposals recover interrupted jobs.
 The storage rejects existing symlink and Windows reparse-point path components. This is not protection
 against an adversary with concurrent write access to the same OS account or data directory.
+
+Daily token admission reserves estimates transactionally in the same owned database. Exact CLI usage,
+when available, is recorded even if the generated proposal is rejected or malformed. Crash/missing-report
+reservations remain conservatively charged. This is not a monetary cap or a provider-side output limit.
 
 Installing this package does not establish hook trust. Review definitions with /hooks in Codex.
 The plugin never bypasses hook trust or the model sandbox. Review again after changes.
