@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .policy import (Conflict, Rejected, digest, frontmatter, redact, safe_directory,
                      safe_name, validate_content)
+from .episode import provenance, records
 
 
 SCHEMA = '''
@@ -40,6 +41,7 @@ CREATE TABLE IF NOT EXISTS leases (scope TEXT PRIMARY KEY, owner TEXT, expires R
 CREATE TABLE IF NOT EXISTS session_paths (scope TEXT,session TEXT,path TEXT,updated REAL,PRIMARY KEY(scope,session));
 CREATE TABLE IF NOT EXISTS attempts (scope TEXT,job TEXT,started REAL);
 CREATE TABLE IF NOT EXISTS contexts (token TEXT PRIMARY KEY, scope TEXT, session TEXT, cwd TEXT, UNIQUE(scope,session));
+CREATE TABLE IF NOT EXISTS version_sources (scope TEXT,name TEXT,version INTEGER,provenance TEXT,PRIMARY KEY(scope,name,version));
 '''
 
 
@@ -151,8 +153,9 @@ class Library:
                 quote = proposal.get('evidence', '')
                 reason = proposal.get('reason', '')
                 if not isinstance(quote, str) or len(quote.strip()) < 8 or len(quote) > 8000 \
-                        or quote not in source or not isinstance(reason, str) or not reason.strip() or len(reason) > 4000:
+                        or (records(source) is None and quote not in source) or not isinstance(reason, str) or not reason.strip() or len(reason) > 4000:
                     raise Rejected('Evidence must quote the supplied episode; reason is required.')
+                attribution = provenance(source, proposal)
                 action = proposal.get('action')
                 if action == 'delete':
                     action = 'archive'
@@ -205,7 +208,7 @@ class Library:
                 validate_content(name, body, files, scope=self.scope,
                                  allow_scripts=allow_scripts or not has_new_scripts)
                 # Include provenance and status: every accepted change gets a distinct stable version.
-                hash_value = digest([body, files, quote, reason, status])
+                hash_value = digest([body, files, quote, reason, status] + ([attribution] if records(source) is not None else []))
                 if not validate_only:
                     self._persist_revision(name, hash_value, body, files, quote)
                 version = db.execute('SELECT COALESCE(MAX(version),0)+1 FROM versions WHERE scope=? AND name=?',
@@ -213,6 +216,8 @@ class Library:
                 db.execute('INSERT INTO versions VALUES (?,?,?,?,?,?,?,?,?,?)',
                            (self.scope, name, version, hash_value, body, json.dumps(files, ensure_ascii=False),
                             status, redact(reason), quote, time.time()))
+                db.execute('INSERT INTO version_sources VALUES (?,?,?,?)',
+                           (self.scope, name, version, json.dumps(attribution, ensure_ascii=False)))
                 if current:
                     db.execute('UPDATE skills SET hash=?,status=? WHERE scope=? AND name=?',
                                (hash_value, status, self.scope, name))
@@ -239,6 +244,9 @@ class Library:
             version = self._version(db, name, skill['hash'])
             result = dict(skill) | dict(version)
             result['files'] = json.loads(result['files'])
+            attributed = db.execute('SELECT provenance FROM version_sources WHERE scope=? AND name=? AND version=?',
+                                    (self.scope,name,version['version'])).fetchone()
+            result['provenance'] = json.loads(attributed[0]) if attributed else {'kind': 'legacy_untyped', 'records': []}
             result['path'] = str(self.revision_path(name, skill['hash']) / 'SKILL.md')
             if count_view:
                 db.execute('UPDATE skills SET views=views+1 WHERE scope=? AND name=?', (self.scope, name))
@@ -261,9 +269,14 @@ class Library:
     def history(self, name):
         safe_name(name)
         with self.connect() as db:
-            return [dict(row) for row in db.execute(
+            results = [dict(row) for row in db.execute(
                 'SELECT version,hash,status,reason,evidence,created FROM versions WHERE scope=? AND name=? ORDER BY version',
                 (self.scope, name))]
+            for item in results:
+                attributed = db.execute('SELECT provenance FROM version_sources WHERE scope=? AND name=? AND version=?',
+                                        (self.scope,name,item['version'])).fetchone()
+                item['provenance'] = json.loads(attributed[0]) if attributed else {'kind': 'legacy_untyped', 'records': []}
+            return results
 
     def restore(self, name, version, expected_hash):
         safe_name(name)
@@ -281,6 +294,10 @@ class Library:
                         f'Restored version {version}.', old['evidence'], time.time()))
             db.execute('UPDATE skills SET hash=?,status=? WHERE scope=? AND name=?',
                        (old['hash'], 'active', self.scope, name))
+            attributed = db.execute('SELECT provenance FROM version_sources WHERE scope=? AND name=? AND version=?',
+                                    (self.scope,name,version)).fetchone()
+            if attributed:
+                db.execute('INSERT INTO version_sources VALUES (?,?,?,?)', (self.scope,name,next_version,attributed[0]))
         return self.read(name)
 
     def pin(self, name, enabled):
@@ -308,8 +325,9 @@ class Library:
             db.execute('BEGIN')
             skills = [dict(r) for r in db.execute('SELECT * FROM skills WHERE scope=?', (self.scope,))]
             versions = [dict(r) for r in db.execute('SELECT * FROM versions WHERE scope=? ORDER BY name,version', (self.scope,))]
+            sources = [dict(r) for r in db.execute('SELECT * FROM version_sources WHERE scope=? ORDER BY name,version', (self.scope,))]
         with target.open('x', encoding='utf-8') as handle:
-            json.dump(dict(scope=self.scope, skills=skills, versions=versions), handle, ensure_ascii=False)
+            json.dump(dict(scope=self.scope, skills=skills, versions=versions, sources=sources), handle, ensure_ascii=False)
             handle.flush()
             os.fsync(handle.fileno())
         for old in sorted(directory.glob(prefix+'*.json'))[:-max(1, keep)]:

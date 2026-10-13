@@ -43,7 +43,8 @@ class RuntimeTests(unittest.TestCase):
         self.settings = Settings(self.path/'data', self.path/'project', cadence=2, debounce=0)
         self.rt = Runtime(self.settings)
         self.trace = self.path/'trace.jsonl'
-        self.trace.write_text(EVIDENCE+'\n', encoding='utf-8')
+        self.trace.write_text(json.dumps({'type':'response_item','payload':{'type':'message','role':'user',
+                             'content':[{'type':'input_text','text':EVIDENCE}]}})+'\n', encoding='utf-8')
         self.event = dict(session_id='s1', cwd=str(self.settings.cwd), transcript_path=str(self.trace))
 
     def tearDown(self):
@@ -87,7 +88,8 @@ class RuntimeTests(unittest.TestCase):
     def test_successive_session_end_windows_do_not_lose_tail(self):
         self.event_call('SessionEnd')
         with self.trace.open('a', encoding='utf-8') as handle:
-            handle.write('User: Verify dependency versions too.\n')
+            handle.write(json.dumps({'type':'response_item','payload':{'type':'message','role':'user',
+                         'content':[{'type':'input_text','text':'User: Verify dependency versions too.'}]}})+'\n')
         self.event_call('SessionEnd')
         seen = []
         self.rt.work(model=lambda source, *args: seen.append(source) or [])

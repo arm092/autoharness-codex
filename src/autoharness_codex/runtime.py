@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .capture import capture
 from .library import Library
+from .episode import normalize, records
 from .policy import Conflict, Rejected, digest, redact
 
 
@@ -127,7 +128,7 @@ class Runtime:
         if not isinstance(text, str) or len(text.encode('utf-8')) > 200_000:
             raise Rejected('Manual evidence must be text up to 200 KB.')
         with self.lib.transaction() as db:
-            return self._queue(db, redact(text), kind, session, {}, manual=True)
+            return self._queue(db, normalize(redact(text), origin='library' if kind == 'curate' else 'manual'), kind, session, {}, manual=True)
 
     def enqueue_curator(self):
         skills = self.lib.list()
@@ -149,7 +150,7 @@ class Runtime:
                                 (self.scope, session)).fetchone()
             mark = json.loads(latest[0] if latest else state['watermark'])
             source, next_mark = capture(event.get('transcript_path'), mark)
-            job = self._queue(db, source, 'reflect', session, next_mark)
+            job = self._queue(db, normalize(source, origin='transcript') if source else '', 'reflect', session, next_mark)
             if job:
                 db.execute('UPDATE sessions SET calls=0 WHERE scope=? AND session=?', (self.scope, session))
             return job
@@ -280,6 +281,11 @@ class Runtime:
                        (self.scope, owner, now+lease_seconds))
             db.execute("UPDATE jobs SET status='running',started=?,attempts=attempts+1,owner=? WHERE id=?", (now, owner, job['id']))
         try:
+            if records(job['evidence']) is None:
+                job['evidence'] = normalize(job['evidence'], origin='library' if job['kind'] == 'curate' else
+                                             ('manual' if job['session'] == 'manual' else 'transcript'))
+                with self.lib.transaction() as db:
+                    db.execute('UPDATE jobs SET evidence=? WHERE id=? AND owner=?', (job['evidence'],job['id'],owner))
             if model is None and job['status'] != 'proposed':
                 from .model import reflect
                 self.settings._global_job = self.scope == 'global'
