@@ -37,7 +37,13 @@ bounded complete packages, CLI turn.completed usage, and transactional per-scope
 Output allowance is an admission reserve, not a provider-enforced generation limit. Observations and source
 attribution do not prove a rule's semantic correctness; usefulness evaluation remains item 6.
 
-## Later: not included in 1.1.0
+## 1.2.0: Windows installation
+
+Per-user Russian/English Setup.exe with embedded runtime, native registration, repair/update and uninstall.
+No separate Python installation or administrator permissions. Preserve knowledge and require native hook trust.
+Pinned runtime checksum, build workflow and embedded hook/MCP/worker smoke checks.
+
+## Later: not included in 1.2.0
 
 ### 2. Trial status for new skills
 

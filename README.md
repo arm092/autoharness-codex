@@ -10,11 +10,42 @@ and visible daily token admission budgets. The retained development plan is [ROA
 
 ## Requirements
 
-Python 3.11+ and a signed-in Codex CLI with native plugins and hooks. No third-party runtime dependencies
-or separate API key. Windows was verified with Python 3.12.1 and Codex CLI 0.159.0-alpha.12.1.
+An installed, signed-in Codex CLI with native plugins and hooks. Windows Setup includes its own Python runtime;
+no separate Python installation, terminal commands, administrator permissions, or API key are required.
+Source/manual installation requires Python 3.11+. Native Windows integration was verified with Codex CLI
+0.159.0-alpha.12.1; the Windows 1.2 installer bundles official CPython 3.13.16 x64.
 Background reflection consumes your Codex model allowance.
 
 ## Install
+
+### Windows installer (recommended)
+
+1. Download [AutoHarness 1.2.0 Setup.exe](https://github.com/arm092/autoharness-codex/releases/download/v1.2.0/AutoHarness-1.2.0-Windows-x64-Setup.exe).
+2. Run it and follow the Russian or English wizard. Keep the detected Codex executable and profile unless you use a custom installation.
+3. Restart Codex and review/trust the five plugin hooks using `/hooks`.
+
+The installer registers only AutoHarness's dedicated local marketplace. It does not change PATH, install
+system Python, or trust hooks. Windows 10/11 x64 is supported; other installer architectures are not included.
+The installer is unsigned, so Windows may show an unknown-publisher warning. SHA256 checksums accompany the release.
+
+**Обновление:** закрой сессии Codex и запусти новый установщик с прежней папкой и профилем.
+Повторная установка также восстанавливает повреждённый кеш плагина.
+**Удаление:** «Параметры Windows → Приложения → AutoHarness for Codex → Удалить».
+Библиотека знаний сохраняется в `CODEX_HOME/autoharness-codex` или заданном `AUTOHARNESS_CODEX_DATA`.
+
+If registration fails, Setup returns a nonzero exit code and shows an explicit error rather than reporting
+the plugin ready. Program files and pending state remain available for repair or removal. A changed profile
+or conflicting marketplace is rejected before files are overwritten. Keep the selected Codex executable available
+for native unregistration; if it is removed or inaccessible, uninstall stops and retains the program files.
+
+If you previously installed the source package manually, remove that registration first to avoid two copies:
+`codex plugin remove autoharness-codex@autoharness-codex-local`.
+Knowledge storage remains the same. Installer updates use `autoharness-codex-windows`.
+
+The bundled portable ZIP has the same runtime. Extract it to a permanent folder and follow `INSTALL.txt`;
+moving or deleting that folder requires unregistering it first. `AutoHarness.cmd status` runs the bundled CLI.
+
+### Source/manual installation
 
 Clone this repository or extract the ZIP to a permanent folder. From that folder:
 
@@ -165,7 +196,8 @@ Auto retirement is off. Its opt-in compatibility policy uses 100 project replies
 for maturity and 50 / 20 mature used skills for capacity. Pins and explicit helpfulness protect knowledge.
 Invocation frequency is not a quality score.
 
-Uninstall with codex plugin remove autoharness-codex@autoharness-codex-local.
+For source/manual installation, uninstall with codex plugin remove autoharness-codex@autoharness-codex-local.
+For Windows Setup, use Windows Apps so native registration and program files are removed together.
 Owned data remains available for recovery. Read [SECURITY.md](SECURITY.md) for boundaries and limitations.
 
 ## Verification
@@ -177,8 +209,26 @@ python -m compileall -q src scripts
 ```
 
 CI runs tests on Windows and Ubuntu with Python 3.11, 3.12, and 3.13.
+An additional Windows job builds the actual Setup.exe/portable ZIP and exercises embedded hooks,
+MCP startup and detached workers with system Python absent from PATH. Download its artifacts from Actions.
 Tests use temporary data and mocked model calls. Local checks additionally exercised actual Codex
 reflection, actual consolidation, recall, restore, native installation, and MCP startup.
 Review [CHANGELOG.md](CHANGELOG.md).
+
+### Build the Windows installer
+
+From a repository checkout, install build-time Python 3.11+ and [Inno Setup 6](https://jrsoftware.org/isdl.php).
+These are build requirements only. Use fresh work/output folders:
+
+```powershell
+python scripts/build_windows.py --work-dir build/windows --output-dir dist/windows --compiler "C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
+python scripts/smoke_windows.py --root build/windows/payload
+```
+
+The builder downloads the official embedded runtime and checks its pinned SHA256 before extraction.
+`--runtime-archive` accepts an offline copy with the same checksum. Python's license is included in the runtime;
+`runtime-source.json` records its source and checksum. Outputs are Setup.exe, portable ZIP and a SHA256 manifest.
+Binary releases and local installation state are excluded from Git. Signing needs a publisher certificate and
+is not configured in this repository.
 
 The primary branch is master. Process files, transcripts, credentials, databases, and ZIPs stay outside the repo.

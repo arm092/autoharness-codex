@@ -24,3 +24,29 @@ jobs:
           PYTHONPATH: src
       - name: Compile runtime
         run: python -m compileall -q src scripts
+  windows-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prepare verified build compiler
+        shell: pwsh
+        run: |
+          $taskInnoInstaller = Join-Path $env:RUNNER_TEMP 'inno-setup.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $taskInnoInstaller
+          if ((Get-FileHash $taskInnoInstaller -Algorithm SHA256).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Compiler SHA256 mismatch' }
+          if ((Get-AuthenticodeSignature $taskInnoInstaller).Status -ne 'Valid') { throw 'Compiler signature invalid' }
+          $taskInnoDir = Join-Path $env:RUNNER_TEMP 'inno'
+          $taskInnoProcess = Start-Process $taskInnoInstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/PORTABLE=1',('/DIR="'+$taskInnoDir+'"')) -WindowStyle Hidden -Wait -PassThru
+          if ($taskInnoProcess.ExitCode -ne 0) { throw 'Compiler setup failed' }
+      - name: Build embedded runtime and native installer
+        shell: pwsh
+        run: python scripts/build_windows.py --work-dir build/windows --output-dir dist/windows --compiler "$env:RUNNER_TEMP/inno/ISCC.exe"
+      - name: Verify without system Python on PATH
+        run: python scripts/smoke_windows.py --root build/windows/payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: autoharness-windows-x64
+          path: dist/windows/*

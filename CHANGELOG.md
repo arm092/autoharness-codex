@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0 – 2026-10-14
+
+- Add a per-user Windows x64 Setup.exe with Russian/English wizard, CLI/profile selection, repair/update, and uninstall.
+- Bundle pinned official CPython 3.13.16; installed users do not need system Python or administrator permissions.
+- Check compatibility and registration ownership before installing; retain recoverable pending install state.
+- Refresh Codex's native plugin cache during repair and update; record the selected CLI without changing PATH.
+- Unregister only after uninstall confirmation; preserve the knowledge library and unrelated marketplaces.
+- Verify embedded hooks, MCP, and detached workers with system Python absent from PATH.
+
 ## 1.1.0 – 2026-10-14
 
 - Distinguish direct user instructions, quoted material, tool observations, assistant claims, and manual lessons.
