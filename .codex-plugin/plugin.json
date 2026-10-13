@@ -1,0 +1,16 @@
+{
+  "name": "autoharness-codex",
+  "version": "1.0.0",
+  "description": "Evidence-backed, self-maintaining skill learning for Codex.",
+  "author": {
+    "name": "Arman Khachatryan"
+  },
+  "license": "MIT",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "AutoHarness for Codex",
+    "shortDescription": "Learn from work, preserve evidence, recover changes"
+  }
+}

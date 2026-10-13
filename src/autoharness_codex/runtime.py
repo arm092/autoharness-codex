@@ -51,7 +51,9 @@ class Settings:
     @classmethod
     def from_env(cls, cwd=None):
         env = os.environ
-        data = env.get('AUTOHARNESS_CODEX_DATA') or env.get('PLUGIN_DATA')
+        # Hooks and MCP may receive different PLUGIN_DATA environments. Use one
+        # explicit, stable plugin-owned namespace so their context registry agrees.
+        data = env.get('AUTOHARNESS_CODEX_DATA')
         if not data:
             data = str(Path(env.get('CODEX_HOME', Path.home()/'.codex'))/'autoharness-codex')
         return cls(Path(data), Path(cwd or Path.cwd()).resolve(),
@@ -163,6 +165,13 @@ class Runtime:
                 db.execute('INSERT INTO session_paths VALUES (?,?,?,?) ON CONFLICT(scope,session) DO UPDATE SET path=excluded.path,updated=excluded.updated',
                            (self.scope, str(event['session_id']), str(event['transcript_path']), time.time()))
         if name in ('SessionStart', 'UserPromptSubmit'):
+            token = ''
+            if event.get('session_id'):
+                with self.lib.transaction() as db:
+                    db.execute('INSERT OR IGNORE INTO contexts VALUES (?,?,?,?)',
+                               (uuid.uuid4().hex, self.scope, str(event['session_id']), str(self.settings.cwd)))
+                    token = db.execute('SELECT token FROM contexts WHERE scope=? AND session=?',
+                                       (self.scope, str(event['session_id']))).fetchone()[0]
             if self.settings.retire and name == 'SessionStart':
                 self.lib.retire_unused(self.lib.counter('turns'),
                                        maturity=300 if self.scope == 'global' else 100,
@@ -171,7 +180,8 @@ class Runtime:
                 (launch or self.launch)()
             return {'hookSpecificOutput': {'hookEventName': name,
                      'additionalContext': self.index(event.get('prompt') if name == 'UserPromptSubmit' else None)
-                     + ('\nCurrent session_id: '+str(event['session_id']) if event.get('session_id') else '')}}
+                     + ('\nCurrent session_id: '+str(event['session_id']) if event.get('session_id') else '')
+                     + ('\ncontext_token: '+token+'\nPass this context_token in every AutoHarness MCP call; never use a token from another chat.' if token else '')}}
         if name == 'PostToolUse':
             session, tool_id = str(event.get('session_id', '')), event.get('tool_use_id')
             if not session or not tool_id:

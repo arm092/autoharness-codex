@@ -1,0 +1,15 @@
+{
+  "name": "autoharness-codex-local",
+  "interface": {
+    "displayName": "AutoHarness for Codex"
+  },
+  "plugins": [
+    {
+      "name": "autoharness-codex",
+      "source": {
+        "source": "local",
+        "path": "./"
+      }
+    }
+  ]
+}

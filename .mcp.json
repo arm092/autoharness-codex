@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "library": {
+      "command": "python",
+      "cwd": ".",
+      "args": [
+        "./scripts/entry.py",
+        "mcp",
+        "--require-context"
+      ],
+      "env": {
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}

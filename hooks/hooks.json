@@ -1,0 +1,66 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/entry.py\" hook",
+            "timeout": 10,
+            "additionalContextLimit": 6500,
+            "commandWindows": "python \"${PLUGIN_ROOT}/scripts/entry.py\" hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/entry.py\" hook",
+            "timeout": 10,
+            "additionalContextLimit": 6500,
+            "commandWindows": "python \"${PLUGIN_ROOT}/scripts/entry.py\" hook"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/entry.py\" hook",
+            "timeout": 10,
+            "commandWindows": "python \"${PLUGIN_ROOT}/scripts/entry.py\" hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/entry.py\" hook",
+            "timeout": 10,
+            "commandWindows": "python \"${PLUGIN_ROOT}/scripts/entry.py\" hook"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/scripts/entry.py\" hook",
+            "timeout": 3,
+            "commandWindows": "python \"${PLUGIN_ROOT}/scripts/entry.py\" hook"
+          }
+        ]
+      }
+    ]
+  }
+}

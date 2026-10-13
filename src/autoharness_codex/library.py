@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS counters (scope TEXT, key TEXT, value INTEGER DEFAULT
 CREATE TABLE IF NOT EXISTS leases (scope TEXT PRIMARY KEY, owner TEXT, expires REAL);
 CREATE TABLE IF NOT EXISTS session_paths (scope TEXT,session TEXT,path TEXT,updated REAL,PRIMARY KEY(scope,session));
 CREATE TABLE IF NOT EXISTS attempts (scope TEXT,job TEXT,started REAL);
+CREATE TABLE IF NOT EXISTS contexts (token TEXT PRIMARY KEY, scope TEXT, session TEXT, cwd TEXT, UNIQUE(scope,session));
 '''
 
 
