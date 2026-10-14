@@ -1,14 +1,19 @@
 """Protect registration ownership and knowledge preservation, without editing real profiles."""
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('windows_install', ROOT/'scripts/windows_install.py')
 driver = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(driver)
+finish_spec = importlib.util.spec_from_file_location('windows_finish', ROOT/'scripts/windows_finish.py')
+finish_driver = importlib.util.module_from_spec(finish_spec)
+finish_spec.loader.exec_module(finish_driver)
 
 
 class FakeCodex:
@@ -111,6 +116,87 @@ class WindowsInstallTests(unittest.TestCase):
         self.assertFalse(any('add' in c or 'remove' in c for c in self.run.calls))
         self.assertEqual((self.root/'install-state.json').read_bytes(), state)
         self.assertTrue(self.run.installed[0]['installed'])
+
+
+class WindowsFinishTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)/"installed программа's"
+        self.root.mkdir()
+        self.home = Path(self.temp.name)/'.codex'
+        user_home = patch.object(finish_driver.Path, 'home', return_value=Path(self.temp.name))
+        user_home.start()
+        self.addCleanup(user_home.stop)
+        (self.root/'install-state.json').write_text(json.dumps(dict(registered=True,
+            plugin=str(self.root/'plugin'), home=str(self.home))), encoding='utf-8')
+        self.env = patch.dict(os.environ, {'CODEX_HOME': str(self.home)})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def test_checked_restart_waits_for_shutdown_then_opens_encoded_plugin_page(self):
+        calls = []
+        running = [object()]
+        def shutdown(items):
+            self.assertEqual(items, running)
+            calls.append('shutdown')
+            running.clear()
+        def launch(url):
+            calls.append(url)
+        finish_driver.finish(self.root, True, True, locate=lambda: 'desktop.exe',
+            processes=lambda exe: list(running), shutdown=shutdown, launch=launch)
+        self.assertEqual(calls[0], 'shutdown')
+        self.assertTrue(calls[1].startswith('codex://plugins/autoharness-codex?marketplacePath='))
+        self.assertNotIn(' ', calls[1])
+        self.assertNotIn("'", calls[1])
+
+    def test_unchecked_options_do_not_close_or_launch_anything(self):
+        locate, launch = Mock(), Mock()
+        self.assertEqual(finish_driver.finish(self.root, False, False, locate=locate, launch=launch)['status'], 'skipped')
+        locate.assert_not_called()
+        launch.assert_not_called()
+
+    def test_open_without_restart_never_requests_shutdown(self):
+        locate, shutdown, launch = Mock(), Mock(), Mock()
+        finish_driver.finish(self.root, False, True, locate=locate, shutdown=shutdown, launch=launch)
+        locate.assert_not_called()
+        shutdown.assert_not_called()
+        launch.assert_called_once()
+
+    def test_refused_or_delayed_shutdown_never_relaunches(self):
+        for refused in (True, False):
+            with self.subTest(refused=refused):
+                launch = Mock()
+                shutdown = Mock(side_effect=RuntimeError('refused')) if refused else Mock()
+                with patch.object(finish_driver.time, 'monotonic', side_effect=[0, 11]):
+                    with self.assertRaises(RuntimeError):
+                        finish_driver.finish(self.root, True, True, locate=lambda: 'desktop.exe',
+                            processes=lambda exe: [object()], shutdown=shutdown, launch=launch)
+                launch.assert_not_called()
+
+    def test_other_profile_and_failed_registration_do_not_restart_active_app(self):
+        launch, locate = Mock(), Mock()
+        with patch.dict(os.environ, {'CODEX_HOME': str(self.home/'different')}):
+            with self.assertRaisesRegex(RuntimeError, 'different Codex profile'):
+                finish_driver.finish(self.root, True, True, locate=locate, launch=launch)
+        state = json.loads((self.root/'install-state.json').read_text())
+        state['registered'] = False
+        (self.root/'install-state.json').write_text(json.dumps(state))
+        with self.assertRaisesRegex(RuntimeError, 'not registered'):
+            finish_driver.finish(self.root, True, True, locate=locate, launch=launch)
+        launch.assert_not_called()
+        locate.assert_not_called()
+
+    def test_matching_custom_environment_does_not_prove_the_desktop_profile(self):
+        state = json.loads((self.root/'install-state.json').read_text())
+        state['home'] = str(self.home/'alternate')
+        (self.root/'install-state.json').write_text(json.dumps(state))
+        locate, launch = Mock(), Mock()
+        with patch.dict(os.environ, {'CODEX_HOME': state['home']}):
+            with self.assertRaisesRegex(RuntimeError, 'different Codex profile'):
+                finish_driver.finish(self.root, True, True, locate=locate, launch=launch)
+        locate.assert_not_called()
+        launch.assert_not_called()
 
 
 if __name__ == '__main__':

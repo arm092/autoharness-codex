@@ -45,6 +45,9 @@ english.ProfileTitle=Codex profile
 english.ProfileDescription=Choose the profile where the plugin will be registered.
 english.ProfileNote=Keep the default unless you use a custom CODEX_HOME. Updates must use the original profile and installation folder.
 english.Finished=Restart Codex, open /hooks and review/trust the five AutoHarness hooks. Your knowledge library is preserved on update and uninstall.
+english.RestartCodex=Restart Codex
+english.OpenPlugin=Open the AutoHarness plugin page
+english.FinishHint=The selected actions run after you click Finish. Codex closes gracefully; if it cannot close, restart it manually. Hook review is available through /hooks in Codex CLI.
 english.BadCli=Select a compatible Codex CLI executable. Details:
 english.RegistrationFailed=Codex plugin registration failed. Installation cannot be completed. Details:
 english.RegistrationHeading=Plugin registration failed
@@ -57,6 +60,9 @@ russian.ProfileTitle=Профиль Codex
 russian.ProfileDescription=Выбери профиль, в котором будет зарегистрирован плагин.
 russian.ProfileNote=Оставь значение по умолчанию, если не используешь свой CODEX_HOME. Для обновления нужны прежние профиль и папка установки.
 russian.Finished=Перезапусти Codex, открой /hooks и разреши пять хуков AutoHarness. Библиотека знаний сохраняется при обновлении и удалении.
+russian.RestartCodex=Перезапустить Codex
+russian.OpenPlugin=Открыть страницу плагина AutoHarness
+russian.FinishHint=Действия выполнятся после нажатия «Готово». Codex закроется штатно; если это не получится, перезапусти его вручную. Проверка хуков: /hooks в Codex CLI.
 russian.BadCli=Выбери совместимый исполняемый файл Codex CLI. Подробности:
 russian.RegistrationFailed=Не удалось зарегистрировать плагин в Codex. Установка не завершена. Подробности:
 russian.RegistrationHeading=Плагин не зарегистрирован
@@ -80,6 +86,7 @@ Name: "{group}\Uninstall AutoHarness"; Filename: "{uninstallexe}"
 Type: files; Name: "{app}\install-state.json"
 Type: files; Name: "{app}\install-state.json.new"
 Type: files; Name: "{app}\plugin\installation.json"
+Type: files; Name: "{app}\finish-result.json"
 Type: files; Name: "{app}\plugin\src\autoharness_codex\__pycache__\*.pyc"
 Type: dirifempty; Name: "{app}\plugin\src\autoharness_codex\__pycache__"
 
@@ -89,6 +96,8 @@ var
   ProfilePage: TInputDirWizardPage;
   RegistrationFailed: Boolean;
   RegistrationDetail: String;
+  RestartCheck, OpenPluginCheck: TNewCheckBox;
+  FinishAccepted: Boolean;
 
 function GetAppId(Param: String): String;
 begin
@@ -134,6 +143,16 @@ begin
     CustomMessage('ProfileDescription'), CustomMessage('ProfileNote'), False, '');
   ProfilePage.Add('CODEX_HOME:');
   ProfilePage.Values[0] := Profile;
+  RestartCheck := TNewCheckBox.Create(WizardForm);
+  RestartCheck.Parent := WizardForm.FinishedPage;
+  RestartCheck.SetBounds(WizardForm.FinishedLabel.Left, ScaleY(120), WizardForm.FinishedLabel.Width, ScaleY(22));
+  RestartCheck.Caption := CustomMessage('RestartCodex');
+  RestartCheck.Checked := True;
+  OpenPluginCheck := TNewCheckBox.Create(WizardForm);
+  OpenPluginCheck.Parent := WizardForm.FinishedPage;
+  OpenPluginCheck.SetBounds(WizardForm.FinishedLabel.Left, ScaleY(146), WizardForm.FinishedLabel.Width, ScaleY(22));
+  OpenPluginCheck.Caption := CustomMessage('OpenPlugin');
+  OpenPluginCheck.Checked := True;
 end;
 
 function Driver(Interpreter, Script, Action, Root, Extra: String; var Detail: String): Boolean;
@@ -186,7 +205,38 @@ begin
     if RegistrationFailed then begin
       WizardForm.FinishedHeadingLabel.Caption := CustomMessage('RegistrationHeading');
       WizardForm.FinishedLabel.Caption := RegistrationDetail;
-    end else WizardForm.FinishedLabel.Caption := CustomMessage('Finished');
+    end else begin
+      WizardForm.FinishedLabel.Caption := CustomMessage('FinishHint');
+      WizardForm.FinishedLabel.Height := ScaleY(92);
+      RestartCheck.Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + ScaleY(8);
+      OpenPluginCheck.Top := RestartCheck.Top + RestartCheck.Height + ScaleY(4);
+      Log('Finish options: restart=' + IntToStr(Ord(RestartCheck.Checked)) + ', plugin=' + IntToStr(Ord(OpenPluginCheck.Checked)));
+      Log('Finish layout: labelBottom=' + IntToStr(WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height) + ', restartTop=' + IntToStr(RestartCheck.Top) + ', pluginBottom=' + IntToStr(OpenPluginCheck.Top + OpenPluginCheck.Height) + ', pageHeight=' + IntToStr(WizardForm.FinishedPage.ClientHeight));
+    end;
+    RestartCheck.Visible := not RegistrationFailed;
+    OpenPluginCheck.Visible := not RegistrationFailed;
+  end;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpFinished then FinishAccepted := not RegistrationFailed;
+end;
+
+procedure DeinitializeSetup;
+var
+  Parameters: String;
+  ResultCode: Integer;
+begin
+  if FinishAccepted and not RegistrationFailed and not WizardSilent then begin
+    if RestartCheck.Checked or OpenPluginCheck.Checked then begin
+      Parameters := '"' + ExpandConstant('{app}\plugin\scripts\windows_finish.py') + '" --root "' + ExpandConstant('{app}') + '"';
+      if RestartCheck.Checked then Parameters := Parameters + ' --restart';
+      if OpenPluginCheck.Checked then Parameters := Parameters + ' --open-plugin';
+      if not Exec(ExpandConstant('{app}\plugin\runtime\pythonw.exe'), Parameters, '', SW_HIDE, ewNoWait, ResultCode) then
+        MsgBox('Could not start the Codex restart helper. Restart Codex manually.', mbError, MB_OK);
+    end;
   end;
 end;
 

@@ -15,4 +15,5 @@ runtime/
 *.exe
 installation.json
 install-state.json
+finish-result.json
 *.egg-info/
