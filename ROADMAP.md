@@ -52,19 +52,24 @@ Separate native Apple Silicon/Intel DMG installers with bundled standalone runti
 owned registration/unregister and native CI. Signing uses ad-hoc integrity signatures; Developer ID/notarization and
 automatic macOS desktop restart remain future work requiring the relevant credentials or host integration.
 
-## Next release: correctness and reliability hardening
+## 1.3.1: correctness and reliability hardening
 
-Based on the [complete comparison of 47 upstream issues](docs/UPSTREAM_ISSUE_AUDIT.md), reviewed against v1.3.0 on 2026-10-14.
+Based on all 47 non-PR [upstream issues](https://github.com/tigerless-labs/autoharness/issues), including closed reports, reviewed against v1.3.0 on 2026-10-14. Detailed audit notes are excluded from Git.
 Closed upstream reports remain useful regression scenarios; their state does not imply an unresolved upstream defect.
 
-### P1: fix demonstrated gaps
+### P1: delivered in 1.3.1
 
 - Replace mixed-quote stripping with matching outer-pair parsing. Specify the supported frontmatter subset; reject unsupported multiline/ambiguous fields. Preserve inner quotes and validate index metadata.
 - Reduce legitimate `exec(`/`eval(` example rejection without permitting automatic scripts or loosening model execution boundaries. Add positive attack fixtures and negative instructional-code fixtures.
 - Fail CI if discovery collects zero tests; report collected and skipped counts independently of exit status.
 - Harden privacy fixtures for complete/incomplete PEM, escaped JSON, clipping and split records, and repeated redaction. Add validated credit-card detection with negative business-identifier fixtures; current rules do not cover cards.
 
-Acceptance: reproduce the two policy defects first, demonstrate corrected results and retained safety gates, and exercise an intentionally empty test suite against the CI guard.
+Implemented matching outer-pair parsing with strict scalar validation, context-aware Python mention checks,
+an explicit CI minimum of 70 executed non-skipped tests, JSON-aware privacy filtering and PEM continuation
+tracking. Regression fixtures cover preserved inner quotes, ambiguous metadata, allowed warnings/comments,
+rejected execution calls, empty/all-skipped/failing discovery, incomplete/escaped/clipped/split PEM,
+repeated redaction, payment-card positives and numeric identifier negatives.
+Issuer/Luhn detection is heuristic; it does not promise zero identifier collisions or universal card coverage.
 
 ### P2: knowledge quality and operational visibility
 
@@ -80,7 +85,7 @@ Acceptance: reproduce the two policy defects first, demonstrate corrected result
 - Keep platform installation/update/uninstall instructions consistent. Consider external plugin listings as separately authorized publication work.
 - Retain macOS Developer ID/notarization and graceful restart on the platform roadmap.
 
-## Later: not included in 1.3.0
+## Later: not included in 1.3.1
 
 ### 2. Trial status for new skills
 

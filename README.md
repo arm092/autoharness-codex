@@ -20,7 +20,7 @@ Background reflection consumes your Codex model allowance.
 
 ### macOS installer
 
-Download the [1.3.0 release](https://github.com/arm092/autoharness-codex/releases/tag/v1.3.0):
+Download the [1.3.1 release](https://github.com/arm092/autoharness-codex/releases/tag/v1.3.1):
 choose `macOS-arm64.dmg` for Apple Silicon or `macOS-x86_64.dmg` for Intel. macOS 14+ is required by the installer bundle.
 
 1. Open the DMG and run **Install AutoHarness.app**.
@@ -43,7 +43,7 @@ binaries and retained runtime licenses. Native CI validates both architectures w
 
 ### Windows installer (recommended)
 
-1. Download [AutoHarness 1.2.1 Setup.exe](https://github.com/arm092/autoharness-codex/releases/download/v1.2.1/AutoHarness-1.2.1-Windows-x64-Setup.exe).
+1. Download [AutoHarness 1.3.1 Setup.exe](https://github.com/arm092/autoharness-codex/releases/download/v1.3.1/AutoHarness-1.3.1-Windows-x64-Setup.exe).
 2. Run it and follow the Russian or English wizard. Keep the detected Codex executable and profile unless you use a custom installation.
 3. Keep the default-checked **Restart Codex** and **Open AutoHarness plugin page** options, then click Finish.
 4. Review/trust the five plugin hooks using `/hooks` in Codex CLI.
@@ -238,7 +238,7 @@ Owned data remains available for recovery. Read [SECURITY.md](SECURITY.md) for b
 
 ```powershell
 $env:PYTHONPATH = 'src'
-python -m unittest discover -s tests -v
+python scripts/check_tests.py --minimum 70
 python -m compileall -q src scripts
 ```
 
@@ -249,36 +249,18 @@ Tests use temporary data and mocked model calls. Local checks additionally exerc
 reflection, actual consolidation, recall, restore, native installation, and MCP startup.
 Review [CHANGELOG.md](CHANGELOG.md).
 
-### Build the Windows installer
-
-From a repository checkout, install build-time Python 3.11+ and [Inno Setup 6](https://jrsoftware.org/isdl.php).
-These are build requirements only. Use fresh work/output folders:
-
-```powershell
-python scripts/build_windows.py --work-dir build/windows --output-dir dist/windows --compiler "C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
-python scripts/smoke_windows.py --root build/windows/payload
-```
-
-The builder downloads the official embedded runtime and checks its pinned SHA256 before extraction.
-`--runtime-archive` accepts an offline copy with the same checksum. Python's license is included in the runtime;
-`runtime-source.json` records its source and checksum. Outputs are Setup.exe, portable ZIP and a SHA256 manifest.
-Binary releases and local installation state are excluded from Git. Signing needs a publisher certificate and
-is not configured in this repository.
-
-### Build the macOS installer
-
-Use a native macOS arm64 or x86_64 machine with build-time Python 3.12+ and Xcode command-line tools:
-
-```sh
-python3 scripts/build_macos.py --work-dir build/macos --output-dir dist/macos
-python3 scripts/smoke_macos.py --payload 'build/macos/distribution/Install AutoHarness.app/Contents/Resources/payload'
-```
-
-Build output includes a DMG, a ZIP preserving app/runtime symlinks and a SHA256 manifest. The smoke test uses a
-checksum-pinned native Codex CLI in a temporary profile and does not make model calls or grant hook trust.
-
 The primary branch is master. Process files, transcripts, credentials, databases, and ZIPs stay outside the repo.
 
 ## Development roadmap
 
-See the [roadmap](ROADMAP.md) and the [comparison of all 47 upstream issues](docs/UPSTREAM_ISSUE_AUDIT.md) for addressed differences, confirmed gaps and planned improvements.
+See the [roadmap](ROADMAP.md) for released fixes and planned improvements based on all 47 upstream issues. Detailed audit notes remain local and are excluded from Git.
+
+Frontmatter supports unique, single-line scalar fields. A matching outer single/double quote pair is removed;
+inner quotes of the other type are preserved. YAML blocks, multiline values, escapes inside quoted values,
+duplicate keys and ambiguous syntax are rejected. Plain values retain literal text.
+
+Admission allows inert inline `exec()`/`eval()` API mentions, explicit warnings and Python comments/strings.
+Actual calls in code blocks and instructions to execute them remain rejected; automatic scripts remain disabled.
+Privacy filtering decodes complete JSON records before redaction, tracks PEM continuations across captures and
+discards clipped JSON records. Common Visa/Mastercard/Amex/Discover ranges with valid Luhn checks are masked;
+this heuristic cannot distinguish every payment number from a similarly shaped identifier or detect every issuer.

@@ -1,6 +1,6 @@
 work/
 .process/
-docs/superpowers/
+docs/
 .env
 .env.*
 !.env.example

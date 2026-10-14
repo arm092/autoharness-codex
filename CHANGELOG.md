@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.1 – 2026-10-14
+
+- Preserve inner frontmatter quotes; reject duplicate, multiline and ambiguous scalar metadata.
+- Allow inert Python API mentions, warnings and comments/strings while retaining rejection of executable eval/exec calls and automatic scripts.
+- Reject empty, insufficient and entirely skipped CI discovery; exercise failing and passing fixture suites.
+- Redact decoded JSON strings, escaped/incomplete PEM and continuations across capture windows; discard clipped JSON records before learning.
+- Add common-issuer/Luhn payment-card filtering with negative timestamp and identifier fixtures.
+- Rebuild Windows x64, macOS Apple Silicon and Intel installers with the corrected bundled plugin.
+- Exclude docs/ from Git while retaining local audit notes; remove installer build instructions from README.
+
 ## 1.3.0 – 2026-10-14
 
 - Add macOS arm64/Intel DMG installers with bundled pinned CPython, native dialog setup and separate unregister app.
