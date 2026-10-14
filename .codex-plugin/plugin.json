@@ -1,6 +1,6 @@
 {
   "name": "autoharness-codex",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Evidence-backed, self-maintaining skill learning for Codex.",
   "author": {
     "name": "Arman Khachatryan"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1 – 2026-10-14
+
+- Add default-checked Restart Codex and Open AutoHarness plugin page options after successful interactive Setup.
+- Defer desktop actions until Finish; skip them for silent, failed, or canceled installations.
+- Request graceful desktop shutdown through Windows Restart Manager, without forced termination, and wait before relaunch.
+- Detect the installed MSIX desktop dynamically; retain manual restart when shutdown is refused or app/profile discovery is uncertain.
+- Open the documented local plugin detail link; hook review/trust remains manual through `/hooks` in Codex CLI.
+
 ## 1.2.0 – 2026-10-14
 
 - Add a per-user Windows x64 Setup.exe with Russian/English wizard, CLI/profile selection, repair/update, and uninstall.

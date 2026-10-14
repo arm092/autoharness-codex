@@ -43,6 +43,9 @@ Per-user Russian/English Setup.exe with embedded runtime, native registration, r
 No separate Python installation or administrator permissions. Preserve knowledge and require native hook trust.
 Pinned runtime checksum, build workflow and embedded hook/MCP/worker smoke checks.
 
+1.2.1 adds default-checked graceful desktop restart and local plugin-page opening after interactive Finish.
+Custom desktop profiles remain manual; direct hook navigation requires a supported host link that is not currently documented.
+
 ## Later: not included in 1.2.0
 
 ### 2. Trial status for new skills

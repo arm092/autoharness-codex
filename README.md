@@ -20,9 +20,20 @@ Background reflection consumes your Codex model allowance.
 
 ### Windows installer (recommended)
 
-1. Download [AutoHarness 1.2.0 Setup.exe](https://github.com/arm092/autoharness-codex/releases/download/v1.2.0/AutoHarness-1.2.0-Windows-x64-Setup.exe).
+1. Download [AutoHarness 1.2.1 Setup.exe](https://github.com/arm092/autoharness-codex/releases/download/v1.2.1/AutoHarness-1.2.1-Windows-x64-Setup.exe).
 2. Run it and follow the Russian or English wizard. Keep the detected Codex executable and profile unless you use a custom installation.
-3. Restart Codex and review/trust the five plugin hooks using `/hooks`.
+3. Keep the default-checked **Restart Codex** and **Open AutoHarness plugin page** options, then click Finish.
+4. Review/trust the five plugin hooks using `/hooks` in Codex CLI.
+
+Desktop actions start after Finish and never run for silent, canceled, or failed installs. Restart requests a
+graceful shutdown through Windows Restart Manager and waits for the desktop process to exit; no process is
+forcibly terminated. If Codex refuses to close, the helper asks you to restart manually. You can uncheck either option.
+Automatic restart currently supports the MSIX OpenAI.Codex app with the default `~/.codex` profile;
+custom profiles and other desktop distributions require manual restart. The helper records `finish-result.json`.
+
+The second option opens the documented local plugin detail page. A direct hook-browser deep link is not documented;
+the installer does not fabricate one, send `/hooks` as a chat message, or grant trust automatically.
+See [hook review](https://learn.chatgpt.com/docs/hooks) and [supported deep links](https://learn.chatgpt.com/docs/reference/commands#deep-links).
 
 The installer registers only AutoHarness's dedicated local marketplace. It does not change PATH, install
 system Python, or trust hooks. Windows 10/11 x64 is supported; other installer architectures are not included.
