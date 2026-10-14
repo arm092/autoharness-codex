@@ -1,4 +1,5 @@
 import json
+import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -132,6 +133,19 @@ class LibraryTests(unittest.TestCase):
             self.skipTest('Symlink creation requires OS privileges.')
         with self.assertRaises(Rejected):
             Library(link, 'project:test')
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'macOS root-owned OS alias')
+    def test_macos_system_var_alias_is_canonicalized_without_allowing_user_links(self):
+        canonical = Path(self.temp.name).resolve()
+        if not canonical.is_relative_to('/private/var'):
+            self.skipTest('Temporary directory is outside the macOS var alias.')
+        aliased = Path('/var')/canonical.relative_to('/private/var')/'os-alias-data'
+        library = Library(aliased, 'project:mac-os-alias')
+        self.assertEqual(library.root, aliased.resolve())
+        link = canonical/'user-link'
+        link.symlink_to(library.root, target_is_directory=True)
+        with self.assertRaises(Rejected):
+            Library(Path('/var')/link.relative_to('/private/var'), 'project:unsafe-link')
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('macos_install', ROOT/'scripts/macos_install.py')
@@ -44,7 +45,8 @@ class MacInstallTests(unittest.TestCase):
                 self.markets.append({'name': mac.MARKETPLACE, 'root': str(self.root)})
         elif args[:2] == ['plugin', 'add']:
             if self.fail: raise RuntimeError('refused')
-            self.installed = [{'pluginId': mac.PLUGIN, 'installed': True, 'version': '1.3.0'}]
+            state = mac.read_state(self.root)
+            self.installed = [{'pluginId': mac.PLUGIN, 'installed': True, 'version': '1.3.0', 'source': {'path': state['plugin']}}]
         elif args[:2] == ['plugin', 'remove']: self.installed = []
         elif args[:3] == ['plugin', 'marketplace', 'remove']:
             self.markets = [m for m in self.markets if m['name'] != mac.MARKETPLACE]
@@ -99,6 +101,17 @@ class MacInstallTests(unittest.TestCase):
         state_path.write_text(json.dumps(state))
         with self.assertRaises(ValueError): mac.unregister(self.root, self.run_codex)
         self.assertFalse(any('remove' in args or 'add' in args for args in self.calls))
+
+    def test_failed_copy_preserves_usable_previous_install_state(self):
+        previous = self.install()
+        state_bytes = (self.root/'install-state.json').read_bytes()
+        self.calls.clear()
+        with patch.object(mac.shutil, 'copytree', side_effect=OSError('disk full')):
+            with self.assertRaises(OSError): self.install()
+        self.assertEqual((self.root/'install-state.json').read_bytes(), state_bytes)
+        self.assertTrue((Path(previous['plugin'])/'runtime/bin/python3').is_file())
+        self.assertFalse(any('add' in args for args in self.calls))
+        self.assertTrue(mac.unregister(self.root, self.run_codex)['knowledge_preserved'])
 
 
 if __name__ == '__main__': unittest.main()

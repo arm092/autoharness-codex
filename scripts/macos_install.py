@@ -105,26 +105,32 @@ def install(payload, root, binary, home, run=run_codex):
         raise ValueError('Complete bundled macOS payload is missing.')
     old = preflight(root, binary, home, run)
     manifest = json.loads((source/'.codex-plugin/plugin.json').read_text())
-    root.mkdir(parents=True, exist_ok=True)
     release = managed(root, 'releases')/(manifest['version']+'-'+uuid.uuid4().hex)
     plugin = release/'plugin'
     # Existing releases are never overwritten or deleted, including on failed registration.
     state = dict(owner=OWNER, root=str(root), home=str(home), codex=str(Path(binary).resolve()),
         plugin=str(plugin), version=manifest['version'], registered=False,
         previous_plugin=old.get('plugin') if old else None)
+    root.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.autoharness-prepare-', dir=root.parent) as temporary:
+        prepared = Path(temporary)/'plugin'
+        shutil.copytree(source, prepared, symlinks=True)
+        atomic_json(prepared/'installation.json', {'codex': state['codex']})
+        config = json.loads((prepared/'.mcp.json').read_text())
+        config['mcpServers']['library']['command'] = str(plugin/'runtime/bin/python3')
+        atomic_json(prepared/'.mcp.json', config)
+        release.mkdir(parents=True)
+        prepared.replace(plugin)
+    # Publish pending state only after its complete runtime is available for recovery.
     atomic_json(managed(root, 'install-state.json'), state)
-    shutil.copytree(source, plugin, symlinks=True)
-    atomic_json(plugin/'installation.json', {'codex': state['codex']})
-    config = json.loads((plugin/'.mcp.json').read_text())
-    config['mcpServers']['library']['command'] = str(plugin/'runtime/bin/python3')
-    atomic_json(plugin/'.mcp.json', config)
     market = dict(name=MARKETPLACE, interface={'displayName': 'AutoHarness for Codex'}, plugins=[dict(
         name='autoharness-codex', source=dict(source='local', path='./'+str(plugin.relative_to(root)).replace(os.sep, '/')))])
     atomic_json(managed(root, '.agents/plugins/marketplace.json'), market)
     run(binary, home, ['plugin', 'marketplace', 'add', str(root), '--json'])
     run(binary, home, ['plugin', 'add', PLUGIN, '--json'])
     installed = json.loads(run(binary, home, ['plugin', 'list', '--json'])).get('installed', [])
-    if not any(p.get('pluginId') == PLUGIN and p.get('installed') and p.get('version') == manifest['version'] for p in installed):
+    match = next((p for p in installed if p.get('pluginId') == PLUGIN and p.get('installed') and p.get('version') == manifest['version']), None)
+    if not match or canonical(match.get('source', {}).get('path', '')) != canonical(plugin):
         raise RuntimeError('Codex did not register the requested version. Program releases were retained for recovery.')
     state['registered'] = True
     atomic_json(managed(root, 'install-state.json'), state)

@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import sys
 import re
 from pathlib import Path
 
@@ -75,6 +76,14 @@ def safe_directory(path):
         if component.exists() or component.is_symlink():
             stat = component.lstat()
             if component.is_symlink() or getattr(stat, 'st_file_attributes', 0) & 0x400:
+                # macOS owns these root-level aliases. Canonicalize only the exact
+                # root-owned OS links; user-controlled symlinks still fail below.
+                aliases = {'/var': '/private/var', '/tmp': '/private/tmp', '/etc': '/private/etc'}
+                target = aliases.get(str(component))
+                if sys.platform == 'darwin' and target and component.is_symlink() and stat.st_uid == 0:
+                    actual = os.path.abspath(component.parent/os.readlink(component))
+                    if actual == target:
+                        return safe_directory(Path(target)/path.relative_to(component))
                 raise Rejected('Data paths cannot contain symlinks or junctions.')
     return path
 
