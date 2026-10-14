@@ -110,7 +110,8 @@ class LibraryTests(unittest.TestCase):
                                                 '"\x27Use when testing\x27"'))], EVIDENCE, 'quoted')
         self.assertEqual(self.lib.list()[0]['description'], "'Use when testing'")
         for value in ['"mixed\x27', '|\n  injected line', 'use tests\ndescription: duplicate',
-                      'use tests\n- evil: injected', '"value" # comment', 'use\tcontrol']:
+                      'use tests\n- evil: injected', '"value" # comment', 'use\tcontrol',
+                      'Use when: testing', 'Use when testing # explanation']:
             with self.subTest(value=value), self.assertRaises(Rejected):
                 frontmatter(body().replace('Use when running application tests.', value))
 
@@ -121,7 +122,8 @@ class LibraryTests(unittest.TestCase):
                 self.lib.apply([create(f'doc-{i}', body(f'doc-{i}', text))], EVIDENCE, f'doc-{i}')
         for i, text in enumerate(['exec(payload)', 'Run `eval()` now.', '```python\nexec(payload)\n```',
                                   '```javascript\neval(payload)\n```', 'Never use eval() but run exec(payload).',
-                                  '```python\nbuiltins.exec(payload)\n```']):
+                                  '```python\nbuiltins.exec(payload)\n```',
+                                  'Avoid latency: invoke exec(payload).', 'Never forget to call eval(payload).']):
             with self.subTest(text=text), self.assertRaises(Rejected):
                 self.lib.apply([create(f'unsafe-{i}', body(f'unsafe-{i}', text))], EVIDENCE, f'unsafe-{i}')
 

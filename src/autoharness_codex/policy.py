@@ -73,8 +73,11 @@ def dangerous_python(content):
         if not PYTHON_CALL.search(line):
             continue
         # A warning must begin the line and contain no instruction to run it.
-        if re.match(r'^\s*(?:[-*]\s*)?(?:do not|don\x27t|never|avoid)\b', line, re.I) and not re.search(
-                r'\b(?:then|instead|but|run|execute)\b', line, re.I):
+        warning = re.match(r'^\s*(?:[-*]\s*)?(?:(?:do not|don\x27t|never)\s+'
+                           r'(?:use|call|run|execute|invoke)|avoid\s+'
+                           r'(?:using|calling|running|executing|invoking))\b', line, re.I)
+        if warning and len(PYTHON_CALL.findall(line)) == 1 and not re.search(
+                r'\b(?:then|instead|but|run|execute|invoke|call)\b', line[warning.end():], re.I):
             continue
         # Bare API names in inline documentation are inert, but runnable code
         # or imperative prose stays rejected, including backtick-wrapped calls.
@@ -106,13 +109,18 @@ def redact_record(text):
         value = json.loads(text)
     except ValueError:
         return redact(text)
+    pem_open = False
     def visit(item):
+        nonlocal pem_open
         if isinstance(item, str):
-            return redact(item)
+            continuation = pem_open
+            for marker in re.finditer(r'-----(BEGIN|END) [A-Z ]*PRIVATE KEY-----', item):
+                pem_open = marker[1] == 'BEGIN'
+            return '[REDACTED:secret]' if continuation else redact(item)
         if isinstance(item, list):
             return [visit(v) for v in item]
         if isinstance(item, dict):
-            return {redact(k): visit(v) for k, v in item.items()}
+            return {visit(k): visit(v) for k, v in item.items()}
         return item
     return json.dumps(visit(value), ensure_ascii=False, separators=(',', ':'))
 
@@ -176,6 +184,8 @@ def frontmatter(body):
             quote, value = value[0], value[1:-1]
             if quote in value or '\\' in value:
                 raise Rejected('Escaped or nested matching quotes are unsupported.')
+        elif ': ' in value or ' #' in value or value.startswith(('- ', '? ', ': ')):
+            raise Rejected('Ambiguous plain scalars must be quoted.')
         fields[key] = value
     return fields, body[match.end():]
 

@@ -52,6 +52,11 @@ class CaptureTests(unittest.TestCase):
                 self.assertIn('REDACTED', text)
             path.write_text(json.dumps({'text':key,'after':'retain ordinary context'})+'\n', encoding='utf-8')
             self.assertEqual(json.loads(capture(path, {})[0])['after'], 'retain ordinary context')
+            path.write_text(json.dumps({'content':[{'text':begin}, {'text':'SYNTHETIC_KEY_BODY'},
+                                                   {'text':finish}], 'after':'retain context'})+'\n', encoding='utf-8')
+            text, _ = capture(path, {})
+            self.assertNotIn('KEY_BODY', text)
+            self.assertEqual(json.loads(text)['after'], 'retain context')
             path.write_text('x'*5000+begin+'\n', encoding='utf-8')
             text, mark = capture(path, {}, record_cap=80)
             self.assertTrue(mark['pem_open'])
