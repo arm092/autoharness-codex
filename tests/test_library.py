@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from autoharness_codex.library import Library, Conflict, Rejected
+from autoharness_codex.policy import frontmatter
 
 
 EVIDENCE = 'User: Always check the active runtime before running tests.'
@@ -100,6 +101,29 @@ class LibraryTests(unittest.TestCase):
         global_lib = Library(self.root, 'global')
         with self.assertRaises(Rejected):
             global_lib.apply([create(text=body(rule='Read C:/project/file.php.'))], EVIDENCE, 'global')
+
+    def test_frontmatter_preserves_inner_quotes_and_rejects_ambiguous_metadata(self):
+        fields, _ = frontmatter(body().replace('Use when running application tests.',
+                                              '"\x27Use when testing\x27"'))
+        self.assertEqual(fields['description'], "'Use when testing'")
+        self.lib.apply([create(text=body().replace('Use when running application tests.',
+                                                '"\x27Use when testing\x27"'))], EVIDENCE, 'quoted')
+        self.assertEqual(self.lib.list()[0]['description'], "'Use when testing'")
+        for value in ['"mixed\x27', '|\n  injected line', 'use tests\ndescription: duplicate',
+                      'use tests\n- evil: injected', '"value" # comment', 'use\tcontrol']:
+            with self.subTest(value=value), self.assertRaises(Rejected):
+                frontmatter(body().replace('Use when running application tests.', value))
+
+    def test_python_documentation_is_allowed_but_execution_instructions_are_rejected(self):
+        for i, text in enumerate(['Do not use eval() in scripts.', 'The `exec()` API executes Python.',
+                                  '```python\n# Avoid eval(value)\nprint("exec(value) is unsafe")\n```']):
+            with self.subTest(text=text):
+                self.lib.apply([create(f'doc-{i}', body(f'doc-{i}', text))], EVIDENCE, f'doc-{i}')
+        for i, text in enumerate(['exec(payload)', 'Run `eval()` now.', '```python\nexec(payload)\n```',
+                                  '```javascript\neval(payload)\n```', 'Never use eval() but run exec(payload).',
+                                  '```python\nbuiltins.exec(payload)\n```']):
+            with self.subTest(text=text), self.assertRaises(Rejected):
+                self.lib.apply([create(f'unsafe-{i}', body(f'unsafe-{i}', text))], EVIDENCE, f'unsafe-{i}')
 
     def test_parallel_stale_writers_cannot_overwrite_newer_revision(self):
         self.lib.apply([create()], EVIDENCE, 'create')

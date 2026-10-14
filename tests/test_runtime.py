@@ -7,6 +7,7 @@ from unittest.mock import patch
 from autoharness_codex.capture import capture
 from autoharness_codex.runtime import Settings, Runtime
 from autoharness_codex.library import Library
+from autoharness_codex.policy import redact
 from test_library import EVIDENCE, create
 
 
@@ -34,6 +35,48 @@ class CaptureTests(unittest.TestCase):
             path.write_bytes((('x'*100_000+'\n')*10).encode())
             text, _ = capture(path, {}, record_cap=100, window_cap=250)
             self.assertLessEqual(len(text.encode()), 250)
+
+    def test_pem_escaped_clipped_and_split_records_do_not_expose_key_bodies(self):
+        begin, finish = '-----BEGIN PRIVATE KEY-----', '-----END PRIVATE KEY-----'
+        key = begin+'\nSYNTHETIC_KEY_BODY\n'+finish
+        for text in [key, begin+'\nSYNTHETIC_KEY_BODY']:
+            self.assertNotIn('SYNTHETIC_KEY_BODY', redact(text))
+            self.assertEqual(redact(redact(text)), redact(text))
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)/'trace.jsonl'
+            for value in [json.dumps({'text':key,'after':'retain ordinary context'}),
+                          json.dumps({'text':key}).replace('SYNTHETIC', '\\u0053YNTHETIC')]:
+                path.write_text(value+'\n', encoding='utf-8')
+                text, _ = capture(path, {})
+                self.assertNotIn('KEY_BODY', text)
+                self.assertIn('REDACTED', text)
+            path.write_text(json.dumps({'text':key,'after':'retain ordinary context'})+'\n', encoding='utf-8')
+            self.assertEqual(json.loads(capture(path, {})[0])['after'], 'retain ordinary context')
+            path.write_text('x'*5000+begin+'\n', encoding='utf-8')
+            text, mark = capture(path, {}, record_cap=80)
+            self.assertTrue(mark['pem_open'])
+            with path.open('a', encoding='utf-8') as handle:
+                handle.write('SYNTHETIC_KEY_BODY\n'+finish+'\nordinary\n')
+            text, mark = capture(path, mark, record_cap=80)
+            self.assertNotIn('KEY_BODY', text)
+            self.assertIn('ordinary', text)
+            self.assertFalse(mark['pem_open'])
+            path.write_text(begin+'\nPARTIAL_KEY', encoding='utf-8')
+            _, mark = capture(path, {})
+            with path.open('a', encoding='utf-8') as handle:
+                handle.write('_BODY\n'+finish+'\n')
+            self.assertNotIn('PARTIAL_KEY', capture(path, mark)[0])
+
+    def test_card_validation_retains_noncard_identifiers_and_redaction_is_idempotent(self):
+        cards = ['4111 1111 1111 1111', '5555-5555-5555-4444', '378282246310005']
+        negatives = ['1700000000000', '1234567890123456', '4111111111111112',
+                     'row_4111111111111111', 'order=9999999999999999']
+        for value in cards:
+            self.assertEqual(redact(value), '[REDACTED:personal]')
+        for value in negatives:
+            self.assertEqual(redact(value), value)
+        text = 'token=ghp_'+'a'*30+' '+cards[0]+' -----BEGIN PRIVATE KEY-----\nBODY'
+        self.assertEqual(redact(redact(text)), redact(text))
 
 
 class RuntimeTests(unittest.TestCase):

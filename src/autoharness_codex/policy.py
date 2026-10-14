@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import re
+import ast
 from pathlib import Path
 
 
@@ -31,7 +32,57 @@ DANGEROUS = re.compile(
     r'(?:bypass|override)\b.{0,30}(?:system|sandbox|permissions)|'
     r'\brm\s+-[rf]{1,2}\s+(?:/|~|\$HOME|\*)|\bdrop\s+table\b|'
     r'(?:curl|wget)\s+[^\n]*\|\s*(?:sh|bash)|'
-    r'Remove-Item\b[^\n]*-Recurse|\b(?:eval|exec)\s*\(', re.I)
+    r'Remove-Item\b[^\n]*-Recurse', re.I)
+PYTHON_CALL = re.compile(r'\b(?:eval|exec)\s*\(', re.I)
+CARD = re.compile(r'(?<![\w.+-])(?:\d[ -]?){12,18}\d(?![\w.-])')
+
+
+def _card(match):
+    value = match[0]
+    digits = re.sub(r'\D', '', value)
+    # Known issuer ranges plus Luhn; arbitrary long identifiers remain unchanged.
+    issuer = (digits.startswith('4') and len(digits) in (13, 16, 19) or
+              len(digits) == 15 and digits[:2] in ('34', '37') or
+              len(digits) == 16 and (51 <= int(digits[:2]) <= 55 or
+              2221 <= int(digits[:4]) <= 2720 or digits.startswith('6011') or
+              digits.startswith('65') or 644 <= int(digits[:3]) <= 649))
+    numbers = [int(n) for n in reversed(digits)]
+    checksum = sum(n if i % 2 == 0 else (2*n-9 if n >= 5 else 2*n)
+                   for i, n in enumerate(numbers))
+    return '[REDACTED:personal]' if issuer and checksum % 10 == 0 else value
+
+
+def dangerous_python(content):
+    """Allow inert API mentions, strings/comments and explicit warnings, not calls."""
+    for language, block in re.findall(r'```([^\n]*)\n([\s\S]*?)```', content):
+        if not PYTHON_CALL.search(block):
+            continue
+        if language.strip().lower() not in ('', 'python', 'py'):
+            return True
+        try:
+            tree = ast.parse(block)
+        except SyntaxError:
+            return True
+        if any(isinstance(node, ast.Call) and
+               ((isinstance(node.func, ast.Name) and node.func.id.lower() in ('exec', 'eval')) or
+                (isinstance(node.func, ast.Attribute) and node.func.attr.lower() in ('exec', 'eval')))
+               for node in ast.walk(tree)):
+            return True
+    prose = re.sub(r'```[\s\S]*?```', '', content)
+    for line in prose.splitlines():
+        if not PYTHON_CALL.search(line):
+            continue
+        # A warning must begin the line and contain no instruction to run it.
+        if re.match(r'^\s*(?:[-*]\s*)?(?:do not|don\x27t|never|avoid)\b', line, re.I) and not re.search(
+                r'\b(?:then|instead|but|run|execute)\b', line, re.I):
+            continue
+        # Bare API names in inline documentation are inert, but runnable code
+        # or imperative prose stays rejected, including backtick-wrapped calls.
+        stripped = re.sub(r'`(?:eval|exec)\(\)`', '', line, flags=re.I)
+        if not PYTHON_CALL.search(stripped) and not re.search(r'\b(?:run|execute|invoke|call)\b', line, re.I):
+            continue
+        return True
+    return False
 NAME = re.compile(r'^[a-z0-9][a-z0-9._-]{0,99}$')
 RESERVED = {'con', 'prn', 'aux', 'nul'} | {f'{s}{i}' for s in ('com', 'lpt') for i in range(1, 10)}
 
@@ -46,7 +97,24 @@ def redact(text):
         text = re.sub(rule, '[REDACTED:secret]', text)
     for rule in PII_RULES:
         text = re.sub(rule, '[REDACTED:personal]', text)
-    return text
+    return CARD.sub(_card, text)
+
+
+def redact_record(text):
+    """Decode JSON escapes before filtering strings, preserving host envelopes."""
+    try:
+        value = json.loads(text)
+    except ValueError:
+        return redact(text)
+    def visit(item):
+        if isinstance(item, str):
+            return redact(item)
+        if isinstance(item, list):
+            return [visit(v) for v in item]
+        if isinstance(item, dict):
+            return {redact(k): visit(v) for k, v in item.items()}
+        return item
+    return json.dumps(visit(value), ensure_ascii=False, separators=(',', ':'))
 
 
 def safe_name(name):
@@ -94,9 +162,21 @@ def frontmatter(body):
         raise Rejected('SKILL.md requires frontmatter.')
     fields = {}
     for line in match[1].splitlines():
-        if ':' in line:
-            key, value = line.split(':', 1)
-            fields[key.strip()] = value.strip().strip('\'"')
+        if not line.strip():
+            continue
+        field = re.fullmatch(r'([a-z][a-z0-9_-]*):[ \t]*(.*)', line)
+        if not field or field[1] in fields:
+            raise Rejected('Frontmatter requires unique single-line scalar fields.')
+        key, value = field[1], field[2].strip()
+        if not value or value[0] in '|>&*!{[' or any(ord(c) < 32 for c in value):
+            raise Rejected('Unsupported frontmatter scalar syntax.')
+        if value[0] in ('\x27', '"'):
+            if len(value) < 2 or value[-1] != value[0]:
+                raise Rejected('Frontmatter quotes must form a matching outer pair.')
+            quote, value = value[0], value[1:-1]
+            if quote in value or '\\' in value:
+                raise Rejected('Escaped or nested matching quotes are unsupported.')
+        fields[key] = value
     return fields, body[match.end():]
 
 
@@ -136,7 +216,9 @@ def validate_content(name, body, files, *, scope, allow_scripts=False):
     for content in [body, *files.values()]:
         if any(re.search(rule, content) for rule in SECRET_RULES):
             raise Rejected('A known secret was detected.')
-        if DANGEROUS.search(content):
+        if CARD.sub(_card, content) != content:
+            raise Rejected('A likely payment card was detected.')
+        if DANGEROUS.search(content) or dangerous_python(content):
             raise Rejected('A dangerous instruction pattern was detected.')
         if re.search(r'\b(?:TODO|FIXME|TBD)\b', content):
             raise Rejected('Unfinished placeholders are not skills.')
