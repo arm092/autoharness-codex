@@ -123,7 +123,9 @@ class LibraryTests(unittest.TestCase):
         for i, text in enumerate(['exec(payload)', 'Run `eval()` now.', '```python\nexec(payload)\n```',
                                   '```javascript\neval(payload)\n```', 'Never use eval() but run exec(payload).',
                                   '```python\nbuiltins.exec(payload)\n```',
-                                  'Avoid latency: invoke exec(payload).', 'Never forget to call eval(payload).']):
+                                  'Avoid latency: invoke exec(payload).', 'Never forget to call eval(payload).',
+                                  'Never use slow parsing; eval(payload) is faster.',
+                                  'Do not use the old parser; eval(payload).']):
             with self.subTest(text=text), self.assertRaises(Rejected):
                 self.lib.apply([create(f'unsafe-{i}', body(f'unsafe-{i}', text))], EVIDENCE, f'unsafe-{i}')
 

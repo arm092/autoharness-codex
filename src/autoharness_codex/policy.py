@@ -76,7 +76,8 @@ def dangerous_python(content):
         warning = re.match(r'^\s*(?:[-*]\s*)?(?:(?:do not|don\x27t|never)\s+'
                            r'(?:use|call|run|execute|invoke)|avoid\s+'
                            r'(?:using|calling|running|executing|invoking))\b', line, re.I)
-        if warning and len(PYTHON_CALL.findall(line)) == 1 and not re.search(
+        negated_api = warning and re.match(r'\s*`?(?:eval|exec)\s*\(', line[warning.end():], re.I)
+        if negated_api and ';' not in line and len(PYTHON_CALL.findall(line)) == 1 and not re.search(
                 r'\b(?:then|instead|but|run|execute|invoke|call)\b', line[warning.end():], re.I):
             continue
         # Bare API names in inline documentation are inert, but runnable code
