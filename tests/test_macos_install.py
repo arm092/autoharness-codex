@@ -113,5 +113,18 @@ class MacInstallTests(unittest.TestCase):
         self.assertFalse(any('add' in args for args in self.calls))
         self.assertTrue(mac.unregister(self.root, self.run_codex)['knowledge_preserved'])
 
+    def test_failed_fresh_state_publication_is_retryable_without_foreign_folder(self):
+        write = mac.atomic_json
+        def fail_state(path, value):
+            if Path(path).name == 'install-state.json':
+                raise OSError('disk full while publishing ownership')
+            return write(path, value)
+        with patch.object(mac, 'atomic_json', side_effect=fail_state):
+            with self.assertRaises(OSError): self.install()
+        self.assertFalse(self.root.exists())
+        self.assertFalse(any('add' in args for args in self.calls))
+        self.assertTrue(self.install()['registered'])
+        self.assertEqual(self.knowledge.read_text(), 'keep this')
+
 
 if __name__ == '__main__': unittest.main()

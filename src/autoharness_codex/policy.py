@@ -70,7 +70,7 @@ def safe_relative(value):
 
 
 def safe_directory(path):
-    """Reject every existing symlink/junction component before creating owned storage."""
+    """Reject user links; canonicalize exact root-owned macOS OS aliases."""
     path = Path(os.path.abspath(path))
     for component in [*reversed(path.parents), path]:
         if component.exists() or component.is_symlink():

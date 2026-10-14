@@ -122,7 +122,20 @@ def install(payload, root, binary, home, run=run_codex):
         release.mkdir(parents=True)
         prepared.replace(plugin)
     # Publish pending state only after its complete runtime is available for recovery.
-    atomic_json(managed(root, 'install-state.json'), state)
+    try:
+        atomic_json(managed(root, 'install-state.json'), state)
+    except OSError:
+        # No registration has run yet. Remove only this newly prepared release,
+        # never a prior version or knowledge, so a fresh install remains retryable.
+        if not release.is_symlink() and release.resolve().is_relative_to(root.resolve()/'releases'):
+            shutil.rmtree(release)
+        if old is None:
+            for empty in (root/'releases', root):
+                try:
+                    empty.rmdir()
+                except OSError:
+                    pass
+        raise
     market = dict(name=MARKETPLACE, interface={'displayName': 'AutoHarness for Codex'}, plugins=[dict(
         name='autoharness-codex', source=dict(source='local', path='./'+str(plugin.relative_to(root)).replace(os.sep, '/')))])
     atomic_json(managed(root, '.agents/plugins/marketplace.json'), market)
