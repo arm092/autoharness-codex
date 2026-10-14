@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 – 2026-10-14
+
+- Add macOS arm64/Intel DMG installers with bundled pinned CPython, native dialog setup and separate unregister app.
+- Install into the user's Library/Application Support without Homebrew, administrator permissions or system Python.
+- Keep immutable program releases during updates/repair; preserve knowledge during unregister.
+- Verify macOS runtime, hooks, MCP, detached workers and actual Codex CLI registration on both native architectures.
+- Retain isolated interpreter mode for detached workers launched from isolated bundled runtimes.
+- Use ad-hoc bundle signing; Developer ID signing and notarization remain unconfigured.
+
 ## 1.2.1 – 2026-10-14
 
 - Add default-checked Restart Codex and Open AutoHarness plugin page options after successful interactive Setup.

@@ -50,3 +50,26 @@ jobs:
         with:
           name: autoharness-windows-x64
           path: dist/windows/*
+  macos-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test on native macOS
+        run: python -m unittest discover -s tests -v
+        env:
+          PYTHONPATH: src
+      - name: Build bundled runtime, native apps and DMG
+        run: python scripts/build_macos.py --work-dir build/macos --output-dir dist/macos
+      - name: Verify bundled runtime and actual Codex registration without system Python
+        run: python scripts/smoke_macos.py --payload 'build/macos/distribution/Install AutoHarness.app/Contents/Resources/payload'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: autoharness-${{ matrix.os }}
+          path: dist/macos/*

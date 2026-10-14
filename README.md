@@ -18,6 +18,29 @@ Background reflection consumes your Codex model allowance.
 
 ## Install
 
+### macOS installer
+
+Download the [1.3.0 release](https://github.com/arm092/autoharness-codex/releases/tag/v1.3.0):
+choose `macOS-arm64.dmg` for Apple Silicon or `macOS-x86_64.dmg` for Intel. macOS 14+ is required by the installer bundle.
+
+1. Open the DMG and run **Install AutoHarness.app**.
+2. Confirm installation. The installer locates Codex or asks you to select its CLI executable.
+3. Close/reopen Codex after updating. The completion dialog can open the local plugin page.
+4. Review/trust the five hooks through `/hooks` in Codex CLI.
+
+Python is included. No Homebrew, system Python, terminal installation commands or administrator permissions are required.
+The program lives under `~/Library/Application Support/AutoHarness for Codex`; knowledge remains under the existing
+Codex profile. Updates and repairs retain older immutable program releases. **Uninstall AutoHarness.app** removes
+the owned plugin and marketplace registration, preserving knowledge and program files. After unregistering, you may
+move the program folder to Trash. Close active Codex sessions before updating or unregistering.
+
+Packages have ad-hoc signatures for integrity, without Developer ID signing or Apple notarization. If macOS blocks
+opening the installer, review it and use the normal **Open Anyway** action in Privacy & Security. No Gatekeeper or
+quarantine bypass is built into the package. The GUI uses native dialogs; macOS automatic desktop restart is not included.
+
+The macOS runtime comes from Astral's standalone CPython builds with pinned SHA256 checksums, architecture-specific
+binaries and retained runtime licenses. Native CI validates both architectures without system Python on PATH.
+
 ### Windows installer (recommended)
 
 1. Download [AutoHarness 1.2.1 Setup.exe](https://github.com/arm092/autoharness-codex/releases/download/v1.2.1/AutoHarness-1.2.1-Windows-x64-Setup.exe).
@@ -241,5 +264,17 @@ The builder downloads the official embedded runtime and checks its pinned SHA256
 `runtime-source.json` records its source and checksum. Outputs are Setup.exe, portable ZIP and a SHA256 manifest.
 Binary releases and local installation state are excluded from Git. Signing needs a publisher certificate and
 is not configured in this repository.
+
+### Build the macOS installer
+
+Use a native macOS arm64 or x86_64 machine with build-time Python 3.12+ and Xcode command-line tools:
+
+```sh
+python3 scripts/build_macos.py --work-dir build/macos --output-dir dist/macos
+python3 scripts/smoke_macos.py --payload 'build/macos/distribution/Install AutoHarness.app/Contents/Resources/payload'
+```
+
+Build output includes a DMG, a ZIP preserving app/runtime symlinks and a SHA256 manifest. The smoke test uses a
+checksum-pinned native Codex CLI in a temporary profile and does not make model calls or grant hook trust.
 
 The primary branch is master. Process files, transcripts, credentials, databases, and ZIPs stay outside the repo.

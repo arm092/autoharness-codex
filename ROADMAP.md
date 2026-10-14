@@ -46,7 +46,13 @@ Pinned runtime checksum, build workflow and embedded hook/MCP/worker smoke check
 1.2.1 adds default-checked graceful desktop restart and local plugin-page opening after interactive Finish.
 Custom desktop profiles remain manual; direct hook navigation requires a supported host link that is not currently documented.
 
-## Later: not included in 1.2.0
+## 1.3.0: macOS packaging
+
+Separate native Apple Silicon/Intel DMG installers with bundled standalone runtime, per-user immutable program releases,
+owned registration/unregister and native CI. Signing uses ad-hoc integrity signatures; Developer ID/notarization and
+automatic macOS desktop restart remain future work requiring the relevant credentials or host integration.
+
+## Later: not included in 1.3.0
 
 ### 2. Trial status for new skills
 

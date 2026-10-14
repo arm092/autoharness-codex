@@ -1,0 +1,26 @@
+AutoHarness for Codex – macOS
+
+Choose arm64 for Apple Silicon (M-series), x86_64 for Intel.
+Open the DMG, then open Install AutoHarness.app and confirm installation.
+Python is included. No Homebrew, system Python, terminal commands or administrator permissions are required.
+Codex must already be installed and signed in, with native plugins/hooks support.
+Close Codex before updating. The final dialog can open the plugin page.
+Review and trust the five hooks through /hooks in Codex CLI.
+
+Uninstall AutoHarness.app removes only this plugin's registration. Knowledge and immutable program releases
+are retained. After unregistering, the program folder can be moved to Trash:
+~/Library/Application Support/AutoHarness for Codex
+Knowledge stays under CODEX_HOME/autoharness-codex or your AUTOHARNESS_CODEX_DATA override.
+
+The package is ad-hoc signed, not Developer ID signed or notarized. If macOS blocks it, use the standard
+Open Anyway flow in System Settings > Privacy & Security after reviewing the downloaded package.
+The installer never disables Gatekeeper or removes quarantine flags.
+
+Русский
+
+Выбери arm64 для Mac с процессором Apple Silicon или x86_64 для Intel.
+Открой DMG и запусти Install AutoHarness.app. Python уже встроен, Homebrew не нужен.
+Перед обновлением закрой Codex. После установки можно открыть страницу плагина.
+Пять хуков нужно разрешить через /hooks в Codex CLI.
+Для удаления запусти Uninstall AutoHarness.app. Библиотека знаний сохранится.
+Пакет не имеет подписи Developer ID и нотариального подтверждения Apple.
