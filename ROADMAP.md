@@ -52,6 +52,34 @@ Separate native Apple Silicon/Intel DMG installers with bundled standalone runti
 owned registration/unregister and native CI. Signing uses ad-hoc integrity signatures; Developer ID/notarization and
 automatic macOS desktop restart remain future work requiring the relevant credentials or host integration.
 
+## Next release: correctness and reliability hardening
+
+Based on the [complete comparison of 47 upstream issues](docs/UPSTREAM_ISSUE_AUDIT.md), reviewed against v1.3.0 on 2026-10-14.
+Closed upstream reports remain useful regression scenarios; their state does not imply an unresolved upstream defect.
+
+### P1: fix demonstrated gaps
+
+- Replace mixed-quote stripping with matching outer-pair parsing. Specify the supported frontmatter subset; reject unsupported multiline/ambiguous fields. Preserve inner quotes and validate index metadata.
+- Reduce legitimate `exec(`/`eval(` example rejection without permitting automatic scripts or loosening model execution boundaries. Add positive attack fixtures and negative instructional-code fixtures.
+- Fail CI if discovery collects zero tests; report collected and skipped counts independently of exit status.
+- Harden privacy fixtures for complete/incomplete PEM, escaped JSON, clipping and split records, and repeated redaction. Add validated credit-card detection with negative business-identifier fixtures; current rules do not cover cards.
+
+Acceptance: reproduce the two policy defects first, demonstrate corrected results and retained safety gates, and exercise an intentionally empty test suite against the CI guard.
+
+### P2: knowledge quality and operational visibility
+
+- Detect semantically duplicate candidates across successive runs before promotion; do not equate replay idempotence with semantic deduplication.
+- Define and expose scope identity for non-Git directories, Git submodules and linked worktrees. Keep ordinary Git subdirectory behavior and profile isolation covered.
+- Add optional completion/rejection notifications with redacted summaries, bounded delivery and failure isolation. Notifications remain off by default.
+- Ship an opt-in real-model lifecycle runbook and anonymized fixtures covering trusted host hooks, dispatch, learning, consolidation, recall and recovery. Keep offline/native smoke separate from real assistance evaluation.
+- Strengthen behavioral coverage for large SessionStart indexes, metadata injection, all support-file directories, individual concurrent feedback counters and retirement-before-index ordering.
+
+### P3: distribution and storage controls
+
+- Consider configurable snapshot retention and safe collection of unpublished orphan revisions; never silently delete recoverable knowledge.
+- Keep platform installation/update/uninstall instructions consistent. Consider external plugin listings as separately authorized publication work.
+- Retain macOS Developer ID/notarization and graceful restart on the platform roadmap.
+
 ## Later: not included in 1.3.0
 
 ### 2. Trial status for new skills

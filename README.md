@@ -278,3 +278,7 @@ Build output includes a DMG, a ZIP preserving app/runtime symlinks and a SHA256 
 checksum-pinned native Codex CLI in a temporary profile and does not make model calls or grant hook trust.
 
 The primary branch is master. Process files, transcripts, credentials, databases, and ZIPs stay outside the repo.
+
+## Development roadmap
+
+See the [roadmap](ROADMAP.md) and the [comparison of all 47 upstream issues](docs/UPSTREAM_ISSUE_AUDIT.md) for addressed differences, confirmed gaps and planned improvements.
