@@ -260,6 +260,8 @@ class Runtime:
             raise Rejected('Plugin entry script not found.')
         args = [sys.executable, str(entry), '--cwd', str(self.settings.cwd), '--data', str(self.settings.data),
                 '--scope', 'global' if self.scope == 'global' else 'project', 'work']
+        if sys.flags.isolated:
+            args.insert(1, '-I')
         kwargs = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                       cwd=str(entry.parent), close_fds=True)
         if os.name == 'nt':
