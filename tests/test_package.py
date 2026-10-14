@@ -13,6 +13,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PackageTests(unittest.TestCase):
+    def test_discovery_guard_rejects_empty_skipped_and_failing_suites(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            def check():
+                return subprocess.run([sys.executable, str(ROOT/'scripts/check_tests.py'),
+                                       '--start-dir', str(folder)], capture_output=True, text=True)
+            empty = check()
+            self.assertNotEqual(empty.returncode, 0)
+            self.assertIn('Collected 0', empty.stdout)
+            path = folder/'test_sample.py'
+            for assertion, decorator, expected in [('self.assertTrue(True)', '', 0),
+                    ('self.assertTrue(False)', '', 1),
+                    ('self.assertTrue(True)', '@unittest.skip("fixture skip")\n', 1)]:
+                path.write_text('import unittest\n'+decorator+'class Sample(unittest.TestCase):\n'
+                                '    def test_sample(self):\n        '+assertion+'\n', encoding='utf-8')
+                # Each child must import the fresh same-length fixture, not cached bytecode.
+                shutil.rmtree(folder/'__pycache__', ignore_errors=True)
+                result = check()
+                self.assertEqual(result.returncode, expected, result.stdout+result.stderr)
+
     def test_entry_hook_uses_event_cwd_and_returns_valid_json(self):
         with tempfile.TemporaryDirectory() as temp:
             data, cwd = Path(temp)/'data', Path(temp)/'project'

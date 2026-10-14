@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Verify library, runtime, protocols, and packaging
-        run: python -m unittest discover -s tests -v
+        run: python scripts/check_tests.py --minimum 70
         env:
           PYTHONPATH: src
       - name: Compile runtime
@@ -62,7 +62,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Test on native macOS
-        run: python -m unittest discover -s tests -v
+        run: python scripts/check_tests.py --minimum 70
         env:
           PYTHONPATH: src
       - name: Build bundled runtime, native apps and DMG
