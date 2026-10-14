@@ -37,6 +37,9 @@ def capture(path, watermark, *, record_cap=4000, window_cap=200_000):
             def scan(chunk):
                 nonlocal active, saw_begin, pending
                 pending += chunk
+                # ASCII JSON escapes can hide a marker or cross read chunks.
+                pending = re.sub(rb'\\u([0-9a-fA-F]{4})', lambda m:
+                                 bytes([int(m[1], 16)]) if int(m[1], 16) < 128 else m[0], pending)
                 last = 0
                 for marker in PEM_MARKER.finditer(pending):
                     active = marker[1] == b'BEGIN'
@@ -58,7 +61,8 @@ def capture(path, watermark, *, record_cap=4000, window_cap=200_000):
                 text += ' [truncated]'
             # A continuation has no identifying BEGIN marker of its own. Mask
             # complete records until END, including across capture invocations.
-            text = '[REDACTED:secret]' if pem_open or (saw_begin and (clipped or active)) else redact_record(text)
+            incomplete_json = clipped and first.lstrip().startswith((b'{', b'['))
+            text = '[REDACTED:secret]' if pem_open or incomplete_json or (saw_begin and (clipped or active)) else redact_record(text)
             pem_open = active
             data = text.encode('utf-8')
             if len(data) + 1 > window_cap:

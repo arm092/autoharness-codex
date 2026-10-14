@@ -61,6 +61,15 @@ class CaptureTests(unittest.TestCase):
             self.assertNotIn('KEY_BODY', text)
             self.assertIn('ordinary', text)
             self.assertFalse(mark['pem_open'])
+            escaped_begin = ''.join('\\u%04x' % ord(c) for c in begin)
+            path.write_text('{"text":"'+escaped_begin+'"}\n', encoding='utf-8')
+            _, mark = capture(path, {})
+            self.assertTrue(mark['pem_open'])
+            with path.open('a', encoding='utf-8') as handle:
+                handle.write('{"text":"SYNTHETIC_KEY_BODY"}\n'+finish+'\n')
+            self.assertNotIn('KEY_BODY', capture(path, mark)[0])
+            path.write_text(json.dumps({'text':'prefix '+key+'x'*5000})+'\n', encoding='utf-8')
+            self.assertNotIn('KEY_BODY', capture(path, {}, record_cap=120)[0])
             path.write_text(begin+'\nPARTIAL_KEY', encoding='utf-8')
             _, mark = capture(path, {})
             with path.open('a', encoding='utf-8') as handle:
